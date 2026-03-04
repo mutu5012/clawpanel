@@ -1,8 +1,8 @@
+use crate::utils::openclaw_command_async;
 /// Agent 管理命令 — 调用 openclaw CLI 实现增删改查
 use serde_json::Value;
 use std::fs;
 use std::io::Write;
-use crate::utils::openclaw_command_async;
 
 /// 获取 agent 列表
 #[tauri::command]
@@ -19,13 +19,16 @@ pub async fn list_agents() -> Result<Value, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(&stdout)
-        .map_err(|e| format!("解析 JSON 失败: {e}"))
+    serde_json::from_str(&stdout).map_err(|e| format!("解析 JSON 失败: {e}"))
 }
 
 /// 创建新 agent
 #[tauri::command]
-pub async fn add_agent(name: String, model: String, workspace: Option<String>) -> Result<Value, String> {
+pub async fn add_agent(
+    name: String,
+    model: String,
+    workspace: Option<String>,
+) -> Result<Value, String> {
     let ws = match workspace {
         Some(ref w) if !w.is_empty() => std::path::PathBuf::from(w),
         _ => super::openclaw_dir()
@@ -95,10 +98,9 @@ pub fn update_agent_identity(
     emoji: Option<String>,
 ) -> Result<String, String> {
     let path = super::openclaw_dir().join("openclaw.json");
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取配置失败: {e}"))?;
-    let mut config: Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 JSON 失败: {e}"))?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("读取配置失败: {e}"))?;
+    let mut config: Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {e}"))?;
 
     let agents_list = config
         .get_mut("agents")
@@ -113,7 +115,8 @@ pub fn update_agent_identity(
 
     // 确保 identity 字段存在且为对象
     if !agent.get("identity").and_then(|i| i.as_object()).is_some() {
-        agent.as_object_mut()
+        agent
+            .as_object_mut()
             .ok_or("Agent 格式错误")?
             .insert("identity".to_string(), serde_json::json!({}));
     }
@@ -135,21 +138,21 @@ pub fn update_agent_identity(
     }
 
     // 提前提取 workspace 路径（克隆为 String，避免借用冲突）
-    let workspace_path = agent.get("workspace")
+    let workspace_path = agent
+        .get("workspace")
         .and_then(|w| w.as_str())
         .map(|s| s.to_string())
         .or_else(|| {
-            config.get("agents")
+            config
+                .get("agents")
                 .and_then(|a| a.get("defaults"))
                 .and_then(|d| d.get("workspace"))
                 .and_then(|w| w.as_str())
                 .map(|s| s.to_string())
         });
 
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化失败: {e}"))?;
-    fs::write(&path, json)
-        .map_err(|e| format!("写入配置失败: {e}"))?;
+    let json = serde_json::to_string_pretty(&config).map_err(|e| format!("序列化失败: {e}"))?;
+    fs::write(&path, json).map_err(|e| format!("写入配置失败: {e}"))?;
 
     // 删除 IDENTITY.md 文件，让配置文件生效
     if let Some(ws_str) = workspace_path {
@@ -175,8 +178,7 @@ pub fn backup_agent(id: String) -> Result<String, String> {
     let zip_name = format!("agent-{}-{}.zip", id, now.format("%Y%m%d-%H%M%S"));
     let zip_path = tmp_dir.join(&zip_name);
 
-    let file = fs::File::create(&zip_path)
-        .map_err(|e| format!("创建 zip 失败: {e}"))?;
+    let file = fs::File::create(&zip_path).map_err(|e| format!("创建 zip 失败: {e}"))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
@@ -193,20 +195,19 @@ fn collect_dir_to_zip(
     zip: &mut zip::ZipWriter<fs::File>,
     options: zip::write::SimpleFileOptions,
 ) -> Result<(), String> {
-    let entries = fs::read_dir(dir)
-        .map_err(|e| format!("读取目录失败: {e}"))?;
+    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {e}"))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
-        let rel = path.strip_prefix(base)
+        let rel = path
+            .strip_prefix(base)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
         if path.is_dir() {
             collect_dir_to_zip(base, &path, zip, options)?;
         } else {
-            let content = fs::read(&path)
-                .map_err(|e| format!("读取 {rel} 失败: {e}"))?;
+            let content = fs::read(&path).map_err(|e| format!("读取 {rel} 失败: {e}"))?;
             zip.start_file(&rel, options)
                 .map_err(|e| format!("写入 zip 失败: {e}"))?;
             zip.write_all(&content)
@@ -220,10 +221,9 @@ fn collect_dir_to_zip(
 #[tauri::command]
 pub fn update_agent_model(id: String, model: String) -> Result<String, String> {
     let path = super::openclaw_dir().join("openclaw.json");
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取配置失败: {e}"))?;
-    let mut config: Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 JSON 失败: {e}"))?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("读取配置失败: {e}"))?;
+    let mut config: Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {e}"))?;
 
     let agents_list = config
         .get_mut("agents")
@@ -237,14 +237,13 @@ pub fn update_agent_model(id: String, model: String) -> Result<String, String> {
         .ok_or(format!("Agent「{id}」不存在"))?;
 
     let model_obj = serde_json::json!({ "primary": model });
-    agent.as_object_mut()
+    agent
+        .as_object_mut()
         .ok_or("Agent 格式错误")?
         .insert("model".to_string(), model_obj);
 
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化失败: {e}"))?;
-    fs::write(&path, json)
-        .map_err(|e| format!("写入配置失败: {e}"))?;
+    let json = serde_json::to_string_pretty(&config).map_err(|e| format!("序列化失败: {e}"))?;
+    fs::write(&path, json).map_err(|e| format!("写入配置失败: {e}"))?;
 
     Ok("已更新".into())
 }

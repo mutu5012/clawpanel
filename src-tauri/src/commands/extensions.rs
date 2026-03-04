@@ -1,8 +1,8 @@
 /// 扩展工具命令（cftunnel + ClawApp）
 use serde_json::Value;
-use std::process::Command;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+use std::process::Command;
 
 /// 按第一个冒号（半角 ':' 或全角 '：'）分割，返回冒号之后的内容（trim 后）
 fn split_after_colon(s: &str) -> &str {
@@ -30,7 +30,9 @@ fn parse_cftunnel_status(output: &str) -> serde_json::Map<String, Value> {
             let running = rest.contains("运行中");
             map.insert("running".into(), Value::Bool(running));
             // 匹配英文和全角 'PID:' / 'PID：'
-            let pid_rest = rest.split("PID:").nth(1)
+            let pid_rest = rest
+                .split("PID:")
+                .nth(1)
                 .or_else(|| rest.split("PID：").nth(1));
             if let Some(pid_str) = pid_rest {
                 let pid = pid_str.trim().trim_end_matches(')').trim();
@@ -73,7 +75,10 @@ fn cftunnel_bin() -> String {
         let candidates = [
             home.join("bin").join("cftunnel.exe"),
             home.join(".cftunnel").join("cftunnel.exe"),
-            home.join("AppData").join("Local").join("cftunnel").join("cftunnel.exe"),
+            home.join("AppData")
+                .join("Local")
+                .join("cftunnel")
+                .join("cftunnel.exe"),
         ];
         for path in &candidates {
             if path.exists() {
@@ -98,10 +103,7 @@ fn check_cftunnel_process() -> Option<(Option<u64>, bool)> {
     #[cfg(target_os = "macos")]
     {
         // macOS: 通过 launchctl 检测
-        let output = Command::new("launchctl")
-            .args(["list"])
-            .output()
-            .ok()?;
+        let output = Command::new("launchctl").args(["list"]).output().ok()?;
         let text = String::from_utf8_lossy(&output.stdout);
         for line in text.lines() {
             if line.contains("com.cftunnel") {
@@ -126,7 +128,9 @@ fn check_cftunnel_process() -> Option<(Option<u64>, bool)> {
         let text = String::from_utf8_lossy(&output.stdout);
         if text.contains("cftunnel.exe") {
             // 尝试提取 PID（CSV 格式: "cftunnel.exe","1234",...）
-            let pid = text.lines().next()
+            let pid = text
+                .lines()
+                .next()
                 .and_then(|line| line.split(',').nth(1))
                 .and_then(|s| s.trim_matches('"').parse::<u64>().ok());
             return Some((pid, true));
@@ -143,7 +147,9 @@ fn check_cftunnel_process() -> Option<(Option<u64>, bool)> {
             .ok()?;
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
-            let pid = text.lines().next()
+            let pid = text
+                .lines()
+                .next()
                 .and_then(|s| s.trim().parse::<u64>().ok());
             return Some((pid, true));
         }
@@ -182,7 +188,10 @@ pub fn get_cftunnel_status() -> Result<Value, String> {
     }
 
     // 仅当 status 报未运行时才做进程检测补充
-    let reported_running = result.get("running").and_then(|v| v.as_bool()).unwrap_or(false);
+    let reported_running = result
+        .get("running")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     if !reported_running {
         if let Some((pid, running)) = check_cftunnel_process() {
             if running {
@@ -251,7 +260,8 @@ pub fn get_clawapp_status() -> Result<Value, String> {
     let running = std::net::TcpStream::connect_timeout(
         &"127.0.0.1:3210".parse().unwrap(),
         std::time::Duration::from_millis(150),
-    ).is_ok();
+    )
+    .is_ok();
 
     result.insert("running".into(), Value::Bool(running));
 
@@ -292,10 +302,7 @@ fn check_clawapp_installed() -> bool {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        if let Ok(out) = Command::new("npm")
-            .args(["list", "-g", "clawapp"])
-            .output()
-        {
+        if let Ok(out) = Command::new("npm").args(["list", "-g", "clawapp"]).output() {
             return out.status.success();
         }
         false
@@ -307,8 +314,8 @@ fn check_clawapp_installed() -> bool {
 /// Windows: PowerShell 下载安装
 #[tauri::command]
 pub async fn install_cftunnel(app: tauri::AppHandle) -> Result<String, String> {
-    use std::process::Stdio;
     use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
     use tauri::Emitter;
 
     let _ = app.emit("install-log", "开始安装 cftunnel...");
@@ -354,10 +361,21 @@ Write-Output '安装完成'
 "#;
         // 使用完整路径调用 PowerShell，避免 MSYS2/Git Bash 环境下找不到
         let ps_path = std::env::var("SystemRoot")
-            .map(|root| format!("{}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", root))
+            .map(|root| {
+                format!(
+                    "{}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+                    root
+                )
+            })
             .unwrap_or_else(|_| "powershell.exe".to_string());
         Command::new(&ps_path)
-            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", install_script])
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                install_script,
+            ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -405,8 +423,8 @@ Write-Output '安装完成'
 /// 一键安装 ClawApp（通过 npm）
 #[tauri::command]
 pub async fn install_clawapp(app: tauri::AppHandle) -> Result<String, String> {
-    use std::process::Stdio;
     use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
     use tauri::Emitter;
 
     let _ = app.emit("install-log", "开始安装 ClawApp...");

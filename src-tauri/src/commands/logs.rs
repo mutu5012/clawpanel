@@ -31,8 +31,7 @@ pub fn read_log_tail(log_name: String, lines: Option<u32>) -> Result<String, Str
         return Ok(String::new());
     }
 
-    let mut file = fs::File::open(&path)
-        .map_err(|e| format!("打开日志失败: {e}"))?;
+    let mut file = fs::File::open(&path).map_err(|e| format!("打开日志失败: {e}"))?;
 
     let file_len = file
         .metadata()
@@ -83,8 +82,7 @@ pub fn search_log(
         return Ok(vec![]);
     }
 
-    let mut file = fs::File::open(&path)
-        .map_err(|e| format!("打开日志失败: {e}"))?;
+    let mut file = fs::File::open(&path).map_err(|e| format!("打开日志失败: {e}"))?;
 
     let file_len = file
         .metadata()

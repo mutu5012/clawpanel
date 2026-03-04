@@ -1,6 +1,6 @@
-use std::process::Command;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+use std::process::Command;
 
 /// 跨平台获取 openclaw 命令的方法（同步版本）
 /// 在 Windows 上使用 `cmd /c openclaw` 以兼容全局 npm 路径下的 `.cmd` 脚本

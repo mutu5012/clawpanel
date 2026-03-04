@@ -33,7 +33,9 @@ mod platform {
             .output()
             .map_err(|e| format!("获取 UID 失败: {e}"))?;
         let uid_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        uid_str.parse::<u32>().map_err(|e| format!("解析 UID 失败: {e}"))
+        uid_str
+            .parse::<u32>()
+            .map_err(|e| format!("解析 UID 失败: {e}"))
     }
 
     /// 动态扫描 LaunchAgents 目录，只返回 OpenClaw 核心服务
@@ -60,19 +62,13 @@ mod platform {
 
     fn plist_path(label: &str) -> String {
         let home = dirs::home_dir().unwrap_or_default();
-        format!(
-            "{}/Library/LaunchAgents/{}.plist",
-            home.display(),
-            label
-        )
+        format!("{}/Library/LaunchAgents/{}.plist", home.display(), label)
     }
 
     /// 用 launchctl print 检测单个服务状态，返回 (running, pid)
     pub fn check_service_status(uid: u32, label: &str) -> (bool, Option<u32>) {
         let target = format!("gui/{}/{}", uid, label);
-        let output = Command::new("launchctl")
-            .args(["print", &target])
-            .output();
+        let output = Command::new("launchctl").args(["print", &target]).output();
 
         let Ok(out) = output else {
             return (false, None);
@@ -221,8 +217,12 @@ mod platform {
     /// 检测 openclaw CLI 是否已安装（文件系统检测，避免 spawn 进程）
     pub fn is_cli_installed() -> bool {
         if let Ok(appdata) = std::env::var("APPDATA") {
-            let cmd_path = std::path::Path::new(&appdata).join("npm").join("openclaw.cmd");
-            if cmd_path.exists() { return true; }
+            let cmd_path = std::path::Path::new(&appdata)
+                .join("npm")
+                .join("openclaw.cmd");
+            if cmd_path.exists() {
+                return true;
+            }
         }
         false
     }
@@ -237,7 +237,11 @@ mod platform {
         let config_path = crate::commands::openclaw_dir().join("openclaw.json");
         if let Ok(content) = std::fs::read_to_string(&config_path) {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(port) = val.get("gateway").and_then(|g| g.get("port")).and_then(|p| p.as_u64()) {
+                if let Some(port) = val
+                    .get("gateway")
+                    .and_then(|g| g.get("port"))
+                    .and_then(|p| p.as_u64())
+                {
                     if port > 0 && port < 65536 {
                         return port as u16;
                     }
@@ -252,7 +256,9 @@ mod platform {
         let port = read_gateway_port();
         let addr = format!("127.0.0.1:{port}");
         match std::net::TcpStream::connect_timeout(
-            &addr.parse().unwrap_or_else(|_| "127.0.0.1:18789".parse().unwrap()),
+            &addr
+                .parse()
+                .unwrap_or_else(|_| "127.0.0.1:18789".parse().unwrap()),
             std::time::Duration::from_millis(150),
         ) {
             Ok(_) => (true, None),
@@ -263,7 +269,10 @@ mod platform {
     /// 以前台模式 spawn Gateway（不需要管理员权限）
     pub async fn start_service_impl(_label: &str) -> Result<(), String> {
         if !is_cli_installed() {
-            return Err("openclaw CLI 未安装，请先通过 npm install -g @qingchencloud/openclaw-zh 安装".into());
+            return Err(
+                "openclaw CLI 未安装，请先通过 npm install -g @qingchencloud/openclaw-zh 安装"
+                    .into(),
+            );
         }
         if check_service_status(0, "").0 {
             return Ok(());
@@ -312,7 +321,15 @@ mod platform {
         if check_service_status(0, "").0 {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             let _ = TokioCommand::new("cmd")
-                .args(["/c", "taskkill", "/f", "/im", "node.exe", "/fi", "WINDOWTITLE eq openclaw*"])
+                .args([
+                    "/c",
+                    "taskkill",
+                    "/f",
+                    "/im",
+                    "node.exe",
+                    "/fi",
+                    "WINDOWTITLE eq openclaw*",
+                ])
                 .creation_flags(CREATE_NO_WINDOW)
                 .output()
                 .await;
@@ -323,7 +340,9 @@ mod platform {
     pub async fn restart_service_impl(_label: &str) -> Result<(), String> {
         let _ = stop_service_impl(_label).await;
         for _ in 0..10 {
-            if !check_service_status(0, "").0 { break; }
+            if !check_service_status(0, "").0 {
+                break;
+            }
             tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         }
         start_service_impl(_label).await
@@ -342,7 +361,9 @@ mod platform {
             .output()
             .map_err(|e| format!("获取 UID 失败: {e}"))?;
         let uid_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        uid_str.parse::<u32>().map_err(|e| format!("解析 UID 失败: {e}"))
+        uid_str
+            .parse::<u32>()
+            .map_err(|e| format!("解析 UID 失败: {e}"))
     }
 
     pub async fn is_cli_installed() -> bool {
@@ -378,7 +399,10 @@ mod platform {
 
     async fn gateway_command(action: &str) -> Result<(), String> {
         if !is_cli_installed().await {
-            return Err("openclaw CLI 未安装，请先通过 npm install -g @qingchencloud/openclaw-zh 安装".into());
+            return Err(
+                "openclaw CLI 未安装，请先通过 npm install -g @qingchencloud/openclaw-zh 安装"
+                    .into(),
+            );
         }
         let output = crate::utils::openclaw_command_async()
             .args(["gateway", action])
@@ -431,10 +455,7 @@ pub async fn get_services_status() -> Result<Vec<ServiceStatus>, String> {
             label: label.clone(),
             pid,
             running,
-            description: desc_map
-                .get(label.as_str())
-                .unwrap_or(&"")
-                .to_string(),
+            description: desc_map.get(label.as_str()).unwrap_or(&"").to_string(),
             cli_installed,
         });
     }

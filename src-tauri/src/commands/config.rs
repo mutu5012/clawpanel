@@ -1,11 +1,11 @@
+use crate::utils::openclaw_command;
 /// 配置读写命令
 use serde_json::Value;
 use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-use crate::utils::openclaw_command;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+use std::path::PathBuf;
+use std::process::Command;
 
 use crate::models::types::VersionInfo;
 
@@ -49,10 +49,9 @@ fn backups_dir() -> PathBuf {
 #[tauri::command]
 pub fn read_openclaw_config() -> Result<Value, String> {
     let path = super::openclaw_dir().join("openclaw.json");
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取配置失败: {e}"))?;
-    let mut config: Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 JSON 失败: {e}"))?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("读取配置失败: {e}"))?;
+    let mut config: Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {e}"))?;
 
     // 自动清理 UI 专属字段，防止污染配置导致 CLI 启动失败
     if has_ui_fields(&config) {
@@ -60,8 +59,7 @@ pub fn read_openclaw_config() -> Result<Value, String> {
         // 静默写回清理后的配置
         let bak = super::openclaw_dir().join("openclaw.json.bak");
         let _ = fs::copy(&path, &bak);
-        let json = serde_json::to_string_pretty(&config)
-            .map_err(|e| format!("序列化失败: {e}"))?;
+        let json = serde_json::to_string_pretty(&config).map_err(|e| format!("序列化失败: {e}"))?;
         let _ = fs::write(&path, json);
     }
 
@@ -77,10 +75,8 @@ pub fn write_openclaw_config(config: Value) -> Result<(), String> {
     // 清理 UI 专属字段，避免 CLI schema 校验失败
     let cleaned = strip_ui_fields(config);
     // 写入
-    let json = serde_json::to_string_pretty(&cleaned)
-        .map_err(|e| format!("序列化失败: {e}"))?;
-    fs::write(&path, json)
-        .map_err(|e| format!("写入失败: {e}"))
+    let json = serde_json::to_string_pretty(&cleaned).map_err(|e| format!("序列化失败: {e}"))?;
+    fs::write(&path, json).map_err(|e| format!("写入失败: {e}"))
 }
 
 /// 检测配置中是否包含 UI 专属字段
@@ -134,8 +130,13 @@ fn strip_ui_fields(mut val: Value) -> Value {
                                             mobj.remove("testStatus");
                                             mobj.remove("testError");
                                             if !mobj.contains_key("name") {
-                                                if let Some(id) = mobj.get("id").and_then(|v| v.as_str()) {
-                                                    mobj.insert("name".into(), Value::String(id.to_string()));
+                                                if let Some(id) =
+                                                    mobj.get("id").and_then(|v| v.as_str())
+                                                {
+                                                    mobj.insert(
+                                                        "name".into(),
+                                                        Value::String(id.to_string()),
+                                                    );
                                                 }
                                             }
                                         }
@@ -157,19 +158,15 @@ pub fn read_mcp_config() -> Result<Value, String> {
     if !path.exists() {
         return Ok(Value::Object(Default::default()));
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("读取 MCP 配置失败: {e}"))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("解析 JSON 失败: {e}"))
+    let content = fs::read_to_string(&path).map_err(|e| format!("读取 MCP 配置失败: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {e}"))
 }
 
 #[tauri::command]
 pub fn write_mcp_config(config: Value) -> Result<(), String> {
     let path = super::openclaw_dir().join("mcp.json");
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("序列化失败: {e}"))?;
-    fs::write(&path, json)
-        .map_err(|e| format!("写入失败: {e}"))
+    let json = serde_json::to_string_pretty(&config).map_err(|e| format!("序列化失败: {e}"))?;
+    fs::write(&path, json).map_err(|e| format!("写入失败: {e}"))
 }
 
 /// 获取本地安装的 openclaw 版本号（异步版本）
@@ -201,7 +198,10 @@ async fn get_local_version() -> Option<String> {
             // 先查汉化版，再查官方版
             for pkg in &["@qingchencloud/openclaw-zh", "openclaw"] {
                 let pkg_json = PathBuf::from(&appdata)
-                    .join("npm").join("node_modules").join(pkg).join("package.json");
+                    .join("npm")
+                    .join("node_modules")
+                    .join(pkg)
+                    .join("package.json");
                 if let Ok(content) = fs::read_to_string(&pkg_json) {
                     if let Some(ver) = serde_json::from_str::<Value>(&content)
                         .ok()
@@ -215,9 +215,16 @@ async fn get_local_version() -> Option<String> {
     }
     // 所有平台通用 fallback: CLI 输出（异步）
     use crate::utils::openclaw_command_async;
-    let output = openclaw_command_async().arg("--version").output().await.ok()?;
+    let output = openclaw_command_async()
+        .arg("--version")
+        .output()
+        .await
+        .ok()?;
     let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    raw.split_whitespace().last().filter(|s| !s.is_empty()).map(String::from)
+    raw.split_whitespace()
+        .last()
+        .filter(|s| !s.is_empty())
+        .map(String::from)
 }
 
 /// 从 npm registry 获取最新版本号，超时 5 秒
@@ -226,7 +233,9 @@ async fn get_latest_version_for(source: &str) -> Option<String> {
         .timeout(std::time::Duration::from_secs(2))
         .build()
         .ok()?;
-    let pkg = npm_package_name(source).replace('/', "%2F").replace('@', "%40");
+    let pkg = npm_package_name(source)
+        .replace('/', "%2F")
+        .replace('@', "%40");
     let registry = get_configured_registry();
     let url = format!("{registry}/{pkg}/latest");
     let resp = client.get(&url).send().await.ok()?;
@@ -314,8 +323,8 @@ fn npm_package_name(source: &str) -> &'static str {
 /// 执行 npm 全局升级 openclaw（流式推送日志）
 #[tauri::command]
 pub async fn upgrade_openclaw(app: tauri::AppHandle, source: String) -> Result<String, String> {
-    use std::process::Stdio;
     use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
     use tauri::Emitter;
 
     let current_source = detect_installed_source();
@@ -329,9 +338,7 @@ pub async fn upgrade_openclaw(app: tauri::AppHandle, source: String) -> Result<S
         // 先检查是否真的安装了旧包，如果没有安装，npm uninstall 会报错但不影响
         let _ = app.emit("upgrade-log", format!("清理遗留环境 ({old_pkg})..."));
         let _ = app.emit("upgrade-progress", 5);
-        let _ = npm_command()
-            .args(["uninstall", "-g", &old_pkg])
-            .output();
+        let _ = npm_command().args(["uninstall", "-g", &old_pkg]).output();
     }
 
     let _ = app.emit("upgrade-log", format!("$ npm install -g {pkg}"));
@@ -341,7 +348,9 @@ pub async fn upgrade_openclaw(app: tauri::AppHandle, source: String) -> Result<S
     let configured_registry = get_configured_registry();
     let registry = if pkg_name.contains("openclaw-zh") {
         // 汉化版：淘宝源或官方源
-        if configured_registry.contains("npmmirror.com") || configured_registry.contains("taobao.org") {
+        if configured_registry.contains("npmmirror.com")
+            || configured_registry.contains("taobao.org")
+        {
             configured_registry.as_str()
         } else {
             "https://registry.npmjs.org"
@@ -406,9 +415,7 @@ pub async fn upgrade_openclaw(app: tauri::AppHandle, source: String) -> Result<S
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = openclaw_command()
-                .args(["gateway", "stop"])
-                .output();
+            let _ = openclaw_command().args(["gateway", "stop"]).output();
         }
         // 重新安装
         use crate::utils::openclaw_command_async;
@@ -421,7 +428,10 @@ pub async fn upgrade_openclaw(app: tauri::AppHandle, source: String) -> Result<S
                 let _ = app.emit("upgrade-log", "Gateway 服务已重装");
             }
             _ => {
-                let _ = app.emit("upgrade-log", "⚠️ Gateway 重装失败，请手动执行 openclaw gateway install");
+                let _ = app.emit(
+                    "upgrade-log",
+                    "⚠️ Gateway 重装失败，请手动执行 openclaw gateway install",
+                );
             }
         }
     }
@@ -438,7 +448,10 @@ pub fn check_installation() -> Result<Value, String> {
     let installed = dir.join("openclaw.json").exists();
     let mut result = serde_json::Map::new();
     result.insert("installed".into(), Value::Bool(installed));
-    result.insert("path".into(), Value::String(dir.to_string_lossy().to_string()));
+    result.insert(
+        "path".into(),
+        Value::String(dir.to_string_lossy().to_string()),
+    );
     Ok(Value::Object(result))
 }
 
@@ -467,9 +480,7 @@ pub fn check_node() -> Result<Value, String> {
 #[tauri::command]
 pub fn write_env_file(path: String, config: String) -> Result<(), String> {
     let expanded = if path.starts_with("~/") {
-        dirs::home_dir()
-            .unwrap_or_default()
-            .join(&path[2..])
+        dirs::home_dir().unwrap_or_default().join(&path[2..])
     } else {
         PathBuf::from(&path)
     };
@@ -483,8 +494,7 @@ pub fn write_env_file(path: String, config: String) -> Result<(), String> {
     if let Some(parent) = expanded.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    fs::write(&expanded, &config)
-        .map_err(|e| format!("写入 .env 失败: {e}"))
+    fs::write(&expanded, &config).map_err(|e| format!("写入 .env 失败: {e}"))
 }
 
 // ===== 备份管理 =====
@@ -496,22 +506,23 @@ pub fn list_backups() -> Result<Value, String> {
         return Ok(Value::Array(vec![]));
     }
     let mut backups: Vec<Value> = vec![];
-    let entries = fs::read_dir(&dir)
-        .map_err(|e| format!("读取备份目录失败: {e}"))?;
+    let entries = fs::read_dir(&dir).map_err(|e| format!("读取备份目录失败: {e}"))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
             continue;
         }
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let meta = fs::metadata(&path).ok();
         let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
         // macOS 支持 created()，fallback 到 modified()
         let created = meta
-            .and_then(|m| {
-                m.created().ok().or_else(|| m.modified().ok())
-            })
+            .and_then(|m| m.created().ok().or_else(|| m.modified().ok()))
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_secs())
             .unwrap_or(0);
@@ -534,8 +545,7 @@ pub fn list_backups() -> Result<Value, String> {
 #[tauri::command]
 pub fn create_backup() -> Result<Value, String> {
     let dir = backups_dir();
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("创建备份目录失败: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
 
     let src = super::openclaw_dir().join("openclaw.json");
     if !src.exists() {
@@ -545,8 +555,7 @@ pub fn create_backup() -> Result<Value, String> {
     let now = chrono::Local::now();
     let name = format!("openclaw-{}.json", now.format("%Y%m%d-%H%M%S"));
     let dest = dir.join(&name);
-    fs::copy(&src, &dest)
-        .map_err(|e| format!("备份失败: {e}"))?;
+    fs::copy(&src, &dest).map_err(|e| format!("备份失败: {e}"))?;
 
     let size = fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
     let mut obj = serde_json::Map::new();
@@ -576,8 +585,7 @@ pub fn restore_backup(name: String) -> Result<(), String> {
         let _ = create_backup();
     }
 
-    fs::copy(&backup_path, &target)
-        .map_err(|e| format!("恢复失败: {e}"))?;
+    fs::copy(&backup_path, &target).map_err(|e| format!("恢复失败: {e}"))?;
     Ok(())
 }
 
@@ -590,8 +598,7 @@ pub fn delete_backup(name: String) -> Result<(), String> {
     if !path.exists() {
         return Err(format!("备份文件不存在: {name}"));
     }
-    fs::remove_file(&path)
-        .map_err(|e| format!("删除失败: {e}"))
+    fs::remove_file(&path).map_err(|e| format!("删除失败: {e}"))
 }
 
 /// 获取当前用户 UID（macOS/Linux 用 id -u，Windows 返回 0）
@@ -662,7 +669,6 @@ pub async fn reload_gateway() -> Result<String, String> {
 pub async fn restart_gateway() -> Result<String, String> {
     reload_gateway().await
 }
-
 
 /// 测试模型连通性：向 provider 发送一个简单的 chat completion 请求
 #[tauri::command]
@@ -739,10 +745,7 @@ pub async fn test_model(
 
 /// 获取服务商的远程模型列表（调用 /models 接口）
 #[tauri::command]
-pub async fn list_remote_models(
-    base_url: String,
-    api_key: String,
-) -> Result<Vec<String>, String> {
+pub async fn list_remote_models(base_url: String, api_key: String) -> Result<Vec<String>, String> {
     let url = format!("{}/models", base_url.trim_end_matches('/'));
 
     let client = reqwest::Client::builder()
@@ -811,11 +814,10 @@ pub async fn install_gateway() -> Result<String, String> {
     match cli_check {
         Ok(o) if o.status.success() => {}
         _ => {
-            return Err(
-                "openclaw CLI 未安装。请先执行以下命令安装：\n\n\
+            return Err("openclaw CLI 未安装。请先执行以下命令安装：\n\n\
                  npm install -g @qingchencloud/openclaw-zh\n\n\
-                 安装完成后再点击此按钮安装 Gateway 服务。".into()
-            );
+                 安装完成后再点击此按钮安装 Gateway 服务。"
+                .into());
         }
     }
 
@@ -852,16 +854,13 @@ pub fn uninstall_gateway() -> Result<String, String> {
         let home = dirs::home_dir().unwrap_or_default();
         let plist = home.join("Library/LaunchAgents/ai.openclaw.gateway.plist");
         if plist.exists() {
-            fs::remove_file(&plist)
-                .map_err(|e| format!("删除 plist 失败: {e}"))?;
+            fs::remove_file(&plist).map_err(|e| format!("删除 plist 失败: {e}"))?;
         }
     }
     #[cfg(not(target_os = "macos"))]
     {
         // Windows/Linux: 停止 Gateway 服务
-        let _ = openclaw_command()
-            .args(["gateway", "stop"])
-            .output();
+        let _ = openclaw_command().args(["gateway", "stop"]).output();
     }
 
     Ok("Gateway 服务已卸载".to_string())
@@ -875,6 +874,5 @@ pub fn get_npm_registry() -> Result<String, String> {
 #[tauri::command]
 pub fn set_npm_registry(registry: String) -> Result<(), String> {
     let path = super::openclaw_dir().join("npm-registry.txt");
-    fs::write(&path, registry.trim())
-        .map_err(|e| format!("保存失败: {e}"))
+    fs::write(&path, registry.trim()).map_err(|e| format!("保存失败: {e}"))
 }

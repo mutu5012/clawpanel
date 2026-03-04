@@ -1,8 +1,8 @@
+use crate::utils::openclaw_command_async;
 /// 记忆文件管理命令
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use crate::utils::openclaw_command_async;
 
 /// 检查路径是否包含不安全字符（目录遍历、绝对路径等）
 fn is_unsafe_path(path: &str) -> bool {
@@ -27,8 +27,8 @@ async fn agent_workspace(agent_id: &str) -> Result<PathBuf, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let agents: serde_json::Value = serde_json::from_str(&stdout)
-        .map_err(|e| format!("解析 JSON 失败: {e}"))?;
+    let agents: serde_json::Value =
+        serde_json::from_str(&stdout).map_err(|e| format!("解析 JSON 失败: {e}"))?;
 
     if let Some(arr) = agents.as_array() {
         for a in arr {
@@ -63,7 +63,10 @@ async fn memory_dir_for_agent(agent_id: &str, category: &str) -> Result<PathBuf,
 }
 
 #[tauri::command]
-pub async fn list_memory_files(category: String, agent_id: Option<String>) -> Result<Vec<String>, String> {
+pub async fn list_memory_files(
+    category: String,
+    agent_id: Option<String>,
+) -> Result<Vec<String>, String> {
     let aid = agent_id.as_deref().unwrap_or("main");
     let dir = memory_dir_for_agent(aid, &category).await?;
     if !dir.exists() {
@@ -82,8 +85,7 @@ fn collect_files(
     files: &mut Vec<String>,
     category: &str,
 ) -> Result<(), String> {
-    let entries = fs::read_dir(dir)
-        .map_err(|e| format!("读取目录失败: {e}"))?;
+    let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {e}"))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -95,7 +97,8 @@ fn collect_files(
         } else {
             let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
             if matches!(ext, "md" | "txt" | "json" | "jsonl") {
-                let rel = path.strip_prefix(base)
+                let rel = path
+                    .strip_prefix(base)
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|_| path.to_string_lossy().to_string());
                 files.push(rel);
@@ -122,8 +125,7 @@ pub async fn read_memory_file(path: String, agent_id: Option<String>) -> Result<
         if let Ok(dir) = c {
             let full = dir.join(&path);
             if full.exists() {
-                return fs::read_to_string(&full)
-                    .map_err(|e| format!("读取失败: {e}"));
+                return fs::read_to_string(&full).map_err(|e| format!("读取失败: {e}"));
             }
         }
     }
@@ -132,7 +134,12 @@ pub async fn read_memory_file(path: String, agent_id: Option<String>) -> Result<
 }
 
 #[tauri::command]
-pub async fn write_memory_file(path: String, content: String, category: Option<String>, agent_id: Option<String>) -> Result<(), String> {
+pub async fn write_memory_file(
+    path: String,
+    content: String,
+    category: Option<String>,
+    agent_id: Option<String>,
+) -> Result<(), String> {
     if is_unsafe_path(&path) {
         return Err("非法路径".to_string());
     }
@@ -165,8 +172,7 @@ pub async fn delete_memory_file(path: String, agent_id: Option<String>) -> Resul
         if let Ok(dir) = c {
             let full = dir.join(&path);
             if full.exists() {
-                return fs::remove_file(&full)
-                    .map_err(|e| format!("删除失败: {e}"));
+                return fs::remove_file(&full).map_err(|e| format!("删除失败: {e}"));
             }
         }
     }
@@ -175,7 +181,10 @@ pub async fn delete_memory_file(path: String, agent_id: Option<String>) -> Resul
 }
 
 #[tauri::command]
-pub async fn export_memory_zip(category: String, agent_id: Option<String>) -> Result<String, String> {
+pub async fn export_memory_zip(
+    category: String,
+    agent_id: Option<String>,
+) -> Result<String, String> {
     let aid = agent_id.as_deref().unwrap_or("main");
     let dir = memory_dir_for_agent(aid, &category).await?;
     if !dir.exists() {
@@ -196,16 +205,15 @@ pub async fn export_memory_zip(category: String, agent_id: Option<String>) -> Re
     );
     let zip_path = tmp_dir.join(&zip_name);
 
-    let file = fs::File::create(&zip_path)
-        .map_err(|e| format!("创建 zip 失败: {e}"))?;
+    let file = fs::File::create(&zip_path).map_err(|e| format!("创建 zip 失败: {e}"))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
 
     for rel_path in &files {
         let full_path = dir.join(rel_path);
-        let content = fs::read_to_string(&full_path)
-            .map_err(|e| format!("读取 {rel_path} 失败: {e}"))?;
+        let content =
+            fs::read_to_string(&full_path).map_err(|e| format!("读取 {rel_path} 失败: {e}"))?;
         zip.start_file(rel_path, options)
             .map_err(|e| format!("写入 zip 失败: {e}"))?;
         zip.write_all(content.as_bytes())

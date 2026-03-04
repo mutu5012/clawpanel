@@ -9,11 +9,11 @@ pub fn auto_pair_device() -> Result<String, String> {
         return Err("设备密钥文件不存在".into());
     }
 
-    let device_key_content = std::fs::read_to_string(&device_key_path)
-        .map_err(|e| format!("读取设备密钥失败: {e}"))?;
+    let device_key_content =
+        std::fs::read_to_string(&device_key_path).map_err(|e| format!("读取设备密钥失败: {e}"))?;
 
-    let device_key: serde_json::Value = serde_json::from_str(&device_key_content)
-        .map_err(|e| format!("解析设备密钥失败: {e}"))?;
+    let device_key: serde_json::Value =
+        serde_json::from_str(&device_key_content).map_err(|e| format!("解析设备密钥失败: {e}"))?;
 
     let device_id = device_key["deviceId"]
         .as_str()
@@ -26,20 +26,20 @@ pub fn auto_pair_device() -> Result<String, String> {
         .to_string();
 
     // 读取或创建 paired.json
-    let paired_path = crate::commands::openclaw_dir().join("devices").join("paired.json");
+    let paired_path = crate::commands::openclaw_dir()
+        .join("devices")
+        .join("paired.json");
     let devices_dir = crate::commands::openclaw_dir().join("devices");
 
     // 确保 devices 目录存在
     if !devices_dir.exists() {
-        std::fs::create_dir_all(&devices_dir)
-            .map_err(|e| format!("创建 devices 目录失败: {e}"))?;
+        std::fs::create_dir_all(&devices_dir).map_err(|e| format!("创建 devices 目录失败: {e}"))?;
     }
 
     let mut paired: serde_json::Value = if paired_path.exists() {
         let content = std::fs::read_to_string(&paired_path)
             .map_err(|e| format!("读取 paired.json 失败: {e}"))?;
-        serde_json::from_str(&content)
-            .map_err(|e| format!("解析 paired.json 失败: {e}"))?
+        serde_json::from_str(&content).map_err(|e| format!("解析 paired.json 失败: {e}"))?
     } else {
         serde_json::json!({})
     };
@@ -86,8 +86,7 @@ pub fn auto_pair_device() -> Result<String, String> {
     let new_content = serde_json::to_string_pretty(&paired)
         .map_err(|e| format!("序列化 paired.json 失败: {e}"))?;
 
-    std::fs::write(&paired_path, new_content)
-        .map_err(|e| format!("写入 paired.json 失败: {e}"))?;
+    std::fs::write(&paired_path, new_content).map_err(|e| format!("写入 paired.json 失败: {e}"))?;
 
     Ok("设备配对成功".into())
 }
@@ -100,27 +99,27 @@ pub fn check_pairing_status() -> Result<bool, String> {
         return Ok(false);
     }
 
-    let device_key_content = std::fs::read_to_string(&device_key_path)
-        .map_err(|e| format!("读取设备密钥失败: {e}"))?;
+    let device_key_content =
+        std::fs::read_to_string(&device_key_path).map_err(|e| format!("读取设备密钥失败: {e}"))?;
 
-    let device_key: serde_json::Value = serde_json::from_str(&device_key_content)
-        .map_err(|e| format!("解析设备密钥失败: {e}"))?;
+    let device_key: serde_json::Value =
+        serde_json::from_str(&device_key_content).map_err(|e| format!("解析设备密钥失败: {e}"))?;
 
-    let device_id = device_key["deviceId"]
-        .as_str()
-        .ok_or("设备 ID 不存在")?;
+    let device_id = device_key["deviceId"].as_str().ok_or("设备 ID 不存在")?;
 
     // 检查 paired.json
-    let paired_path = crate::commands::openclaw_dir().join("devices").join("paired.json");
+    let paired_path = crate::commands::openclaw_dir()
+        .join("devices")
+        .join("paired.json");
     if !paired_path.exists() {
         return Ok(false);
     }
 
-    let content = std::fs::read_to_string(&paired_path)
-        .map_err(|e| format!("读取 paired.json 失败: {e}"))?;
+    let content =
+        std::fs::read_to_string(&paired_path).map_err(|e| format!("读取 paired.json 失败: {e}"))?;
 
-    let paired: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 paired.json 失败: {e}"))?;
+    let paired: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("解析 paired.json 失败: {e}"))?;
 
     Ok(paired.get(device_id).is_some())
 }

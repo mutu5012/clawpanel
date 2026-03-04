@@ -1,13 +1,16 @@
 /// 设备密钥管理 + Gateway connect 握手签名
-use ed25519_dalek::{SigningKey, Signer, VerifyingKey};
-use sha2::{Sha256, Digest};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
 
 const DEVICE_KEY_FILE: &str = "clawpanel-device-key.json";
 const SCOPES: &[&str] = &[
-    "operator.admin", "operator.approvals", "operator.pairing",
-    "operator.read", "operator.write",
+    "operator.admin",
+    "operator.approvals",
+    "operator.pairing",
+    "operator.read",
+    "operator.write",
 ];
 
 /// 获取或生成设备密钥
@@ -16,17 +19,15 @@ fn get_or_create_key() -> Result<(String, String, SigningKey), String> {
     let path = dir.join(DEVICE_KEY_FILE);
 
     if path.exists() {
-        let content = fs::read_to_string(&path)
-            .map_err(|e| format!("读取设备密钥失败: {e}"))?;
-        let json: Value = serde_json::from_str(&content)
-            .map_err(|e| format!("解析设备密钥失败: {e}"))?;
+        let content = fs::read_to_string(&path).map_err(|e| format!("读取设备密钥失败: {e}"))?;
+        let json: Value =
+            serde_json::from_str(&content).map_err(|e| format!("解析设备密钥失败: {e}"))?;
 
         let device_id = json["deviceId"].as_str().unwrap_or("").to_string();
         let pub_b64 = json["publicKey"].as_str().unwrap_or("").to_string();
         let secret_hex = json["secretKey"].as_str().unwrap_or("");
 
-        let secret_bytes = hex::decode(secret_hex)
-            .map_err(|e| format!("解码密钥失败: {e}"))?;
+        let secret_bytes = hex::decode(secret_hex).map_err(|e| format!("解码密钥失败: {e}"))?;
         if secret_bytes.len() != 32 {
             return Err("密钥长度错误".into());
         }
@@ -76,9 +77,12 @@ mod hex {
         data.as_ref().iter().map(|b| format!("{b:02x}")).collect()
     }
     pub fn decode(s: &str) -> Result<Vec<u8>, String> {
-        if s.len() % 2 != 0 { return Err("奇数长度".into()) }
-        (0..s.len()).step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i+2], 16).map_err(|e| e.to_string()))
+        if s.len() % 2 != 0 {
+            return Err("奇数长度".into());
+        }
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.to_string()))
             .collect()
     }
 }

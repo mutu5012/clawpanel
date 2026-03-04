@@ -1,10 +1,10 @@
 /// 系统托盘模块
 /// Windows / macOS / Linux 通用，Tauri v2 内置跨平台支持
 use tauri::{
-    AppHandle, Manager,
+    image::Image,
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    image::Image,
+    AppHandle, Manager,
 };
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
@@ -74,4 +74,3 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         _ => {}
     }
 }
-
