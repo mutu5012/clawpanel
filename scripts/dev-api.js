@@ -158,21 +158,21 @@ async function _tryR2Install(version, source, logs) {
     throw new Error(`CDN 版本 ${cdnVersion} 与请求版本 ${version} 不匹配`)
   }
 
-  // 优先通用 tarball（npm pack 产物，~50MB，全平台通用），其次平台特定 assets
+  // 优先平台特定预装归档（直接解压，零网络依赖），其次通用 tarball（需要 npm install）
+  const asset = (platform !== 'unknown') ? sourceObj.assets?.[platform] : null
   const tarball = sourceObj.tarball
-  const asset = sourceObj.assets?.[platform]
-  const useTarball = !!tarball?.url
+  const useAsset = !!asset?.url
+  const useTarball = !useAsset && !!tarball?.url
 
-  if (!useTarball && !asset?.url) {
-    if (platform === 'unknown') throw new Error('当前平台不支持 R2 加速')
-    throw new Error(`CDN 无 ${sourceKey}/${platform} 归档`)
+  if (!useAsset && !useTarball) {
+    throw new Error(`CDN 无 ${sourceKey} 可用归档（平台: ${platform}）`)
   }
 
-  const archiveUrl = useTarball ? tarball.url : asset.url
-  const expectedSha = useTarball ? (tarball.sha256 || '') : (asset.sha256 || '')
-  const expectedSize = useTarball ? (tarball.size || 0) : (asset.size || 0)
+  const archiveUrl = useAsset ? asset.url : tarball.url
+  const expectedSha = useAsset ? (asset.sha256 || '') : (tarball.sha256 || '')
+  const expectedSize = useAsset ? (asset.size || 0) : (tarball.size || 0)
   const sizeMb = expectedSize ? `${(expectedSize / 1048576).toFixed(0)}MB` : '未知大小'
-  const mode = useTarball ? '通用 tarball' : `${platform} 预装归档`
+  const mode = useAsset ? `${platform} 预装归档` : '通用 tarball'
   logs.push(`CDN 下载: ${cdnVersion} (${mode}, ${sizeMb})`)
 
   // 下载到临时文件

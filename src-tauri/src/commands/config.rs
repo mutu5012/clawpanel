@@ -1041,7 +1041,17 @@ async fn try_r2_install(
         .and_then(|v| v.as_str())
         .is_some();
 
-    let (archive_url, expected_sha, expected_size) = if use_tarball {
+    let (archive_url, expected_sha, expected_size) = if let Some(a) = asset {
+        // 优先平台预装归档（直接解压，零网络依赖，最快）
+        (
+            a.get("url")
+                .and_then(|v| v.as_str())
+                .ok_or("归档 URL 缺失")?,
+            a.get("sha256").and_then(|v| v.as_str()).unwrap_or(""),
+            a.get("size").and_then(|v| v.as_u64()).unwrap_or(0),
+        )
+    } else if use_tarball {
+        // 其次通用 tarball（需要 npm install，仍有网络依赖）
         let t = tarball.unwrap();
         (
             t.get("url")
@@ -1049,14 +1059,6 @@ async fn try_r2_install(
                 .ok_or("tarball URL 缺失")?,
             t.get("sha256").and_then(|v| v.as_str()).unwrap_or(""),
             t.get("size").and_then(|v| v.as_u64()).unwrap_or(0),
-        )
-    } else if let Some(a) = asset {
-        (
-            a.get("url")
-                .and_then(|v| v.as_str())
-                .ok_or("归档 URL 缺失")?,
-            a.get("sha256").and_then(|v| v.as_str()).unwrap_or(""),
-            a.get("size").and_then(|v| v.as_u64()).unwrap_or(0),
         )
     } else {
         return Err(format!("CDN 无 {source_key} 可用归档"));
