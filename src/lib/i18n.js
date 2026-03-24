@@ -1,16 +1,15 @@
 /**
  * i18n 国际化核心模块
- * 支持中文(zh-CN)和英文(en)，按需扩展
+ * 模块化多语言架构，支持 zh-CN / en / zh-TW / ja / ko
  */
-import zhCN from '../locales/zh-CN.json'
-import en from '../locales/en.json'
+import { buildLocales } from '../locales/index.js'
 
-const LANGS = { 'zh-CN': zhCN, en }
+const LANGS = buildLocales()
 const LANG_KEY = 'clawpanel_lang'
 const FALLBACK = 'zh-CN'
 
 let _lang = FALLBACK
-let _dict = zhCN
+let _dict = LANGS[FALLBACK]
 let _listeners = []
 
 /**
@@ -23,7 +22,7 @@ export function t(key, params) {
   let val = _resolve(_dict, key)
   if (val === undefined) {
     // fallback 到中文
-    val = _resolve(zhCN, key)
+    val = _resolve(LANGS[FALLBACK], key)
   }
   if (val === undefined) return key
   if (params) {
@@ -51,7 +50,16 @@ export function getLang() { return _lang }
 export function getAvailableLangs() {
   return [
     { code: 'zh-CN', label: '简体中文' },
+    { code: 'zh-TW', label: '繁體中文' },
     { code: 'en', label: 'English' },
+    { code: 'ja', label: '日本語' },
+    { code: 'ko', label: '한국어' },
+    { code: 'vi', label: 'Tiếng Việt' },
+    { code: 'es', label: 'Español' },
+    { code: 'pt', label: 'Português' },
+    { code: 'ru', label: 'Русский' },
+    { code: 'fr', label: 'Français' },
+    { code: 'de', label: 'Deutsch' },
   ]
 }
 
@@ -80,10 +88,28 @@ export function initI18n() {
   }
   // 自动检测浏览器语言
   const nav = navigator.language || navigator.languages?.[0] || ''
-  if (nav.startsWith('zh')) {
+  if (nav === 'zh-TW' || nav === 'zh-HK') {
+    _lang = 'zh-TW'
+  } else if (nav.startsWith('zh')) {
     _lang = 'zh-CN'
+  } else if (nav.startsWith('ja')) {
+    _lang = 'ja'
+  } else if (nav.startsWith('ko')) {
+    _lang = 'ko'
+  } else if (nav.startsWith('vi')) {
+    _lang = 'vi'
+  } else if (nav.startsWith('es')) {
+    _lang = 'es'
+  } else if (nav.startsWith('pt')) {
+    _lang = 'pt'
+  } else if (nav.startsWith('ru')) {
+    _lang = 'ru'
+  } else if (nav.startsWith('fr')) {
+    _lang = 'fr'
+  } else if (nav.startsWith('de')) {
+    _lang = 'de'
   } else if (nav.startsWith('en')) {
     _lang = 'en'
   }
-  _dict = LANGS[_lang] || zhCN
+  _dict = LANGS[_lang] || LANGS[FALLBACK]
 }

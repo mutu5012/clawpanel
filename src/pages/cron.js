@@ -132,6 +132,7 @@ async function fetchJobs(page, state) {
       schedule: j.schedule || {},
       enabled: j.enabled !== false,
       agentId: j.agentId || null,
+      delivery: j.delivery || null,
       lastRunStatus: j.state?.lastRunStatus || j.state?.lastStatus || null,
       lastRunAtMs: j.state?.lastRunAtMs || null,
       lastError: j.state?.lastError || null,
@@ -352,7 +353,7 @@ async function openTaskDialog(job, page, state) {
   api.readOpenclawConfig().then(cfg => {
     const channels = cfg?.channels || {}
     const channelIds = Object.keys(channels).filter(k => k !== 'defaults')
-    if (channelIds.length <= 1) return // 单渠道或无渠道不需要选
+    if (channelIds.length === 0) return // 无渠道不需要选
     const select = modal.querySelector('select[name="deliveryChannel"]')
     if (!select) return
     const current = job?.delivery?.channel || ''
@@ -427,7 +428,7 @@ async function openTaskDialog(job, page, state) {
         if (agentId) patch.agentId = agentId
         const deliveryChannel = modal.querySelector('select[name="deliveryChannel"]')?.value
         if (deliveryChannel) {
-          patch.delivery = { mode: 'push', to: deliveryChannel, channel: deliveryChannel }
+          patch.delivery = { mode: 'announce', channel: deliveryChannel }
         }
         await wsClient.request('cron.update', { jobId: job.id, patch })
         toast(t('cron.updated'), 'success')
@@ -441,7 +442,7 @@ async function openTaskDialog(job, page, state) {
         if (agentId) params.agentId = agentId
         const deliveryChannel = modal.querySelector('select[name="deliveryChannel"]')?.value
         if (deliveryChannel) {
-          params.delivery = { mode: 'push', to: deliveryChannel, channel: deliveryChannel }
+          params.delivery = { mode: 'announce', channel: deliveryChannel }
         }
         await wsClient.request('cron.add', params)
         toast(t('cron.created'), 'success')

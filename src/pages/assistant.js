@@ -52,21 +52,23 @@ const API_TYPES = SHARED_API_TYPES
 function normalizeApiType(raw) {
   const type = (raw || '').trim()
   if (type === 'anthropic' || type === 'anthropic-messages') return 'anthropic-messages'
-  if (type === 'google-gemini') return 'google-gemini'
+  if (type === 'google-gemini' || type === 'google-generative-ai') return 'google-generative-ai'
+  if (type === 'ollama') return 'ollama'
   if (type === 'openai' || type === 'openai-completions' || type === 'openai-responses') return 'openai-completions'
   return 'openai-completions'
 }
 
 function requiresApiKey(apiType) {
   const type = normalizeApiType(apiType)
-  return type === 'anthropic-messages' || type === 'google-gemini'
+  return type === 'anthropic-messages' || type === 'google-generative-ai'
 }
 
 function apiHintText(apiType) {
   return {
     'openai-completions': t('assistant.apiHintOpenai'),
     'anthropic-messages': t('assistant.apiHintAnthropic'),
-    'google-gemini': t('assistant.apiHintGemini'),
+    'google-generative-ai': t('assistant.apiHintGemini'),
+    'ollama': 'Ollama 原生 API，baseUrl 填 http://127.0.0.1:11434（不需要 /v1）',
   }[normalizeApiType(apiType)] || t('assistant.apiHintOpenai')
 }
 
@@ -74,7 +76,8 @@ function apiBasePlaceholder(apiType) {
   return {
     'openai-completions': t('assistant.apiBasePlaceholderOpenai'),
     'anthropic-messages': 'https://api.anthropic.com',
-    'google-gemini': 'https://generativelanguage.googleapis.com/v1beta',
+    'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta',
+    'ollama': 'http://127.0.0.1:11434',
   }[normalizeApiType(apiType)] || 'https://api.openai.com/v1'
 }
 
@@ -82,7 +85,8 @@ function apiKeyPlaceholder(apiType) {
   return {
     'openai-completions': t('assistant.apiKeyPlaceholderOpenai'),
     'anthropic-messages': 'sk-ant-...',
-    'google-gemini': 'AIza...',
+    'google-generative-ai': 'AIza...',
+    'ollama': 'ollama-local',
   }[normalizeApiType(apiType)] || 'sk-...'
 }
 

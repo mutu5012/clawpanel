@@ -1212,9 +1212,17 @@ async fn get_local_version() -> Option<String> {
                 }
             }
         }
-        // npm 全局目录
+        // npm 全局目录 — 根据 CLI 来源决定检查顺序，避免读到非活跃包的版本
         if let Ok(appdata) = std::env::var("APPDATA") {
-            for pkg in &["@qingchencloud/openclaw-zh", "openclaw"] {
+            let cli_is_zh = crate::utils::resolve_openclaw_cli_path()
+                .map(|p| crate::utils::classify_cli_source(&p) == "npm-zh")
+                .unwrap_or(false);
+            let pkgs: &[&str] = if cli_is_zh {
+                &["@qingchencloud/openclaw-zh", "openclaw"]
+            } else {
+                &["openclaw", "@qingchencloud/openclaw-zh"]
+            };
+            for pkg in pkgs {
                 let pkg_json = PathBuf::from(&appdata)
                     .join("npm")
                     .join("node_modules")
@@ -1299,9 +1307,19 @@ fn detect_installed_source() -> String {
         }
         "official".into()
     }
-    // Windows: 优先通过文件系统检测，避免 npm list 阻塞
+    // Windows: 优先通过 CLI 路径判断，fallback 到文件系统检测
     #[cfg(target_os = "windows")]
     {
+        // 优先通过实际 CLI 路径判断（最准确）
+        if let Some(cli_path) = crate::utils::resolve_openclaw_cli_path() {
+            let source = crate::utils::classify_cli_source(&cli_path);
+            if source == "npm-zh" {
+                return "chinese".into();
+            }
+            if source == "npm-official" || source == "npm-global" || source == "standalone" {
+                return "official".into();
+            }
+        }
         // 检查所有可能的 standalone 安装目录
         for sa_dir in all_standalone_dirs() {
             let sa_zh = sa_dir
@@ -1323,8 +1341,8 @@ fn detect_installed_source() -> String {
                 return "chinese".into();
             }
         }
-        // 默认返回汉化版
-        "chinese".into()
+        // 默认返回官方版
+        "official".into()
     }
     // 所有平台通用: npm list 检测
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]

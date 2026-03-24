@@ -9,6 +9,7 @@ export const API_TYPES = [
   { value: 'anthropic-messages', label: 'Anthropic 原生' },
   { value: 'openai-responses', label: 'OpenAI Responses' },
   { value: 'google-generative-ai', label: 'Google Gemini' },
+  { value: 'ollama', label: 'Ollama 原生' },
 ]
 
 // 服务商快捷预设

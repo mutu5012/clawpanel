@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇨🇳 中文</a> | <strong>🇺🇸 English</strong>
+  <a href="README.md">🇨🇳 中文</a> | <strong>🇺🇸 English</strong> | <a href="README.zh-TW.md">🇹🇼 繁體中文</a> | <a href="README.ja.md">🇯🇵 日本語</a> | <a href="README.ko.md">🇰🇷 한국어</a> | <a href="README.vi.md">🇻🇳 Tiếng Việt</a> | <a href="README.es.md">🇪🇸 Español</a> | <a href="README.pt.md">🇧🇷 Português</a> | <a href="README.ru.md">🇷🇺 Русский</a> | <a href="README.fr.md">🇫🇷 Français</a> | <a href="README.de.md">🇩🇪 Deutsch</a>
 </p>
 
 <p align="center">
@@ -31,85 +31,26 @@
   <img src="docs/feature-showcase.gif" width="800" alt="ClawPanel Feature Showcase">
 </p>
 
-ClawPanel is a visual management panel for the [OpenClaw](https://openclaw.ai) AI Agent framework. It features a **built-in intelligent AI assistant** that helps you install OpenClaw with one click, auto-diagnose configurations, troubleshoot issues, and fix errors. 8 tools + 4 modes + interactive Q&A — easy to manage for beginners and experts alike.
+ClawPanel is a visual management panel for the [OpenClaw](https://github.com/1186258278/OpenClawChineseTranslation) AI Agent framework. It features a **built-in intelligent AI assistant** that helps you install OpenClaw with one click, auto-diagnose configurations, troubleshoot issues, and fix errors. 8 tools + 4 modes + interactive Q&A — easy to manage for beginners and experts alike.
 
 > 🌐 **Website**: [claw.qt.cool](https://claw.qt.cool/) | 📦 **Download**: [GitHub Releases](https://github.com/qingchencloud/clawpanel/releases/latest)
 
-## Features
+### 🎁 QingchenCloud AI API
 
-### Dashboard & Monitoring
-- **Real-time Dashboard** — Gateway status, version info, agent fleet, model pool, service health at a glance
-- **Log Viewer** — Real-time Gateway logs with search and filtering
-- **System Diagnostics** — Auto-detect configuration issues, WebSocket connectivity, pairing status
+> Internal technical testing platform, open for selected users. Sign in daily to earn credits.
 
-### AI Assistant (Built-in)
-- **8 Built-in Tools** — Terminal execution, file read/write, directory browsing, web search, URL fetching, system info, process management, port checking
-- **4 Modes** — Full auto, semi-auto, read-only, chat-only
-- **Tool Calling** — AI can directly execute commands, read logs, modify configs to diagnose and fix problems
-- **QingchenCloud Integration** — Free partial model access for panel users, premium models at 2-3x discount for paid users
+<p align="center">
+  <a href="https://gpt.qt.cool"><img src="https://img.shields.io/badge/🔑 QingchenCloud AI-gpt.qt.cool-6366f1?style=for-the-badge" alt="QingchenCloud AI"></a>
+</p>
 
-### Model Configuration
-- **Multi-Provider** — OpenAI, Anthropic, DeepSeek, Google Gemini, Ollama, SiliconFlow, Volcengine, Alibaba Cloud, and more
-- **One-click Model Add** — Browse and select models from QingchenCloud catalog
-- **Model Testing** — Test any model with a single click before deploying
-- **Primary/Fallback** — Set primary model with automatic fallback to alternatives
+- **Daily Sign-in Credits** — Sign in daily + invite friends to earn test credits
+- **OpenAI-Compatible API** — Seamless integration with OpenClaw, plug and play
+- **Resource Policy** — Rate limiting + request caps, may queue during peak hours
+- **Model Availability** — Models/APIs subject to actual page display, may rotate versions
 
-### Agent Management
-- **Multi-Agent** — Create and manage multiple AI agents with independent workspaces
-- **Identity & Personality** — Configure name, emoji, model for each agent
-- **Memory Files** — Manage SOUL.md, IDENTITY.md, AGENTS.md workspace files
-- **Workspace Isolation** — Each agent has its own memory, tools, and configuration
+> ⚠️ **Compliance**: This platform is for technical testing only. Illegal use or circumventing security mechanisms is prohibited. Keep your API Key secure. Rules subject to latest platform policies.
 
-### Messaging Channels
-- **QQ Bot** — Built-in QQ robot integration via QQ Open Platform
-- **Telegram** — Bot Token authentication
-- **Discord** — Bot with guild/channel management
-- **Feishu/Lark** — Enterprise messaging with WebSocket mode
-- **DingTalk** — Enterprise app with Stream mode robot
-- **Multi-Account** — Bind different accounts to different agents
-
-### Gateway & Services
-- **Gateway Control** — Start, stop, restart OpenClaw Gateway
-- **Auto-Guardian** — Automatic Gateway restart on unexpected exit (with cooldown)
-- **Config Editor** — Direct JSON editor for openclaw.json with syntax validation
-- **Backup & Restore** — One-click configuration backup and restore
-
-### Cron Jobs
-- **Scheduled Tasks** — Create cron-based scheduled AI tasks
-- **Delivery Channels** — Route task results to messaging channels
-- **Per-Agent Assignment** — Assign tasks to specific agents
-
-### Security
-- **Access Password** — Protect Web panel with password authentication
-- **Network Proxy** — Configure HTTP/SOCKS proxy for all outbound requests
-- **Session Management** — Secure session tokens with expiration
-
-## Installation
-
-### Desktop App (Windows / macOS / Linux)
-
-Download the latest installer from [GitHub Releases](https://github.com/qingchencloud/clawpanel/releases/latest):
-
-| Platform | Download |
-|----------|----------|
-| **Windows** | `.exe` installer (recommended) or `.msi` |
-| **macOS Apple Silicon** | `.dmg` (aarch64) |
-| **macOS Intel** | `.dmg` (x64) |
-| **Linux** | `.AppImage` / `.deb` / `.rpm` |
-
-### Web Version (No Rust/Tauri Required)
-
-For headless servers, Raspberry Pi, ARM boards, or Docker:
-
-```bash
-git clone https://github.com/qingchencloud/clawpanel.git
-cd clawpanel
-npm install
-npm run serve
-# Open http://localhost:1420 in your browser
-```
-
-### ARM / Embedded Device Support
+### 🔥 Dev Board / Embedded Device Support
 
 ClawPanel provides a **pure Web deployment mode** (zero GUI dependency), natively compatible with ARM64 boards:
 
@@ -118,45 +59,157 @@ ClawPanel provides a **pure Web deployment mode** (zero GUI dependency), nativel
 - **Armbian / Debian / Ubuntu Server** — Auto-detect architecture
 - No Rust / Tauri / GUI needed — **only Node.js 18+ required**
 
-## Quick Start
+> 📖 See [Armbian Deployment Guide](docs/armbian-deploy.md) | [Web Dev Mode](#web-version-no-rusttauri-required)
 
-1. Install and open ClawPanel
-2. First run auto-detects Node.js environment and OpenClaw CLI
-3. If OpenClaw is not installed, click one-click install (R2 CDN accelerated)
-4. After installation, the dashboard loads automatically
+## Community
 
-> **Requirements**: Node.js 18+ (22 LTS recommended)
+A community of passionate AI Agent developers and enthusiasts — join us!
 
-## Tech Stack
+<p align="center">
+  <a href="https://discord.gg/U9AttmsNHh"><strong>Discord</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/qingchencloud/clawpanel/discussions"><strong>Discussions</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/qingchencloud/clawpanel/issues/new"><strong>Report Issue</strong></a>
+</p>
 
-- **Frontend**: Vanilla JS + CSS Custom Properties (zero framework dependency)
-- **Desktop**: Tauri v2 (Rust backend)
-- **Web Backend**: Node.js (Express-compatible API server)
-- **Build**: Vite
-- **CI/CD**: GitHub Actions (cross-platform builds)
+## Features
 
-## Development
+- **🤖 AI Assistant (New)** — Built-in AI assistant, 4 modes + 8 tools + interactive Q&A. See [AI Assistant Highlights](#-ai-assistant-highlights)
+- **🖼️ Image Recognition** — Paste screenshots or drag images, AI auto-analyzes, multimodal conversations
+- **Dashboard** — System overview, real-time service monitoring, quick actions
+- **Service Management** — OpenClaw start/stop, version detection & one-click upgrade, Gateway install/uninstall, config backup & restore
+- **Model Configuration** — Multi-provider management, model CRUD, batch connectivity tests, latency detection, drag-to-reorder, auto-save + undo
+- **Gateway Configuration** — Port, access scope (localhost/LAN), auth Token, Tailscale networking
+- **Messaging Channels** — Unified Telegram, Discord, Feishu, DingTalk, QQ management, multi-Agent binding per platform
+- **Communication & Automation** — Message settings, broadcast strategies, slash commands, Webhooks, execution approval
+- **Usage Analytics** — Token usage, API costs, model/provider/tool rankings, daily usage charts
+- **Agent Management** — Agent CRUD, identity editing, model config, workspace management
+- **Chat** — Streaming, Markdown rendering, session management, /fast /think /verbose /reasoning commands
+- **Cron Jobs** — Cron-based scheduled execution, multi-channel delivery
+- **Log Viewer** — Multi-source real-time logs with keyword search
+- **Memory Management** — Memory file view/edit, categorized management, ZIP export, Agent switching
+- **QingchenCloud AI API** — Internal testing platform, OpenAI-compatible, daily sign-in credits
+- **Extensions** — cftunnel tunnel management, ClawApp status monitoring
+- **About** — Version info, community links, related projects, one-click upgrade
+
+## Download & Install
+
+Go to [Releases](https://github.com/qingchencloud/clawpanel/releases/latest) for the latest version:
+
+### macOS
+
+| Chip | Installer | Notes |
+|------|-----------|-------|
+| Apple Silicon (M1/M2/M3/M4) | `ClawPanel_x.x.x_aarch64.dmg` | Macs from late 2020+ |
+| Intel | `ClawPanel_x.x.x_x64.dmg` | Macs 2020 and earlier |
+
+> **⚠️ "Damaged" or "unverified developer"?** App is unsigned. Run: `sudo xattr -rd com.apple.quarantine /Applications/ClawPanel.app`
+
+### Windows
+
+| Format | Installer | Notes |
+|--------|-----------|-------|
+| EXE | `ClawPanel_x.x.x_x64-setup.exe` | Recommended |
+| MSI | `ClawPanel_x.x.x_x64_en-US.msi` | Enterprise / silent install |
+
+### Linux
+
+| Format | Installer | Notes |
+|--------|-----------|-------|
+| AppImage | `ClawPanel_x.x.x_amd64.AppImage` | No install, `chmod +x` and run |
+| DEB | `ClawPanel_x.x.x_amd64.deb` | `sudo dpkg -i *.deb` |
+| RPM | `ClawPanel-x.x.x-1.x86_64.rpm` | `sudo rpm -i *.rpm` |
+
+### Linux Server (Web Version)
 
 ```bash
-# Prerequisites: Node.js 22+, Rust toolchain, Tauri CLI
-
-# Clone
-git clone https://github.com/qingchencloud/clawpanel.git
-cd clawpanel
-
-# Install dependencies
-npm install
-
-# Desktop development (Tauri)
-npm run tauri dev
-
-# Web-only development
-npm run serve
+curl -fsSL https://raw.githubusercontent.com/qingchencloud/clawpanel/main/scripts/linux-deploy.sh | bash
 ```
+
+Visit `http://YOUR_SERVER_IP:1420` after deployment. 📖 [Linux Deployment Guide](docs/linux-deploy.md)
+
+### Docker
+
+```bash
+docker run -d --name clawpanel --restart unless-stopped \
+  -p 1420:1420 -v clawpanel-data:/root/.openclaw \
+  node:22-slim \
+  sh -c "apt-get update && apt-get install -y git && \
+    npm install -g @qingchencloud/openclaw-zh --registry https://registry.npmmirror.com && \
+    git clone https://github.com/qingchencloud/clawpanel.git /app && \
+    cd /app && npm install && npm run build && npm run serve"
+```
+
+📖 [Docker Deployment Guide](docs/docker-deploy.md)
+
+## Quick Start
+
+1. **Initial Setup** — First launch auto-detects Node.js, Git, OpenClaw. One-click install if missing.
+2. **Configure Models** — Add AI providers (DeepSeek, OpenAI, Ollama, etc.) with API keys. Test connectivity.
+3. **Start Gateway** — Go to Service Management, click Start. Green status = ready.
+4. **Start Chatting** — Go to Live Chat, select model, start conversation with streaming & Markdown.
+
+## 🤖 AI Assistant Highlights
+
+Built-in AI assistant that can **directly operate your system** — diagnose, fix, even submit PRs.
+
+### Four Modes
+
+| Mode | Icon | Tools | Write | Confirm | Use Case |
+|------|------|-------|-------|---------|----------|
+| **Chat** | 💬 | ❌ | ❌ | — | Pure Q&A |
+| **Plan** | 📋 | ✅ | ❌ | ✅ | Read configs/logs, output plans |
+| **Execute** | ⚡ | ✅ | ✅ | ✅ | Normal work, dangerous ops need confirm |
+| **Unlimited** | ∞ | ✅ | ✅ | ❌ | Full auto, no prompts |
+
+### Eight Tools
+
+| Tool | Function |
+|------|----------|
+| `ask_user` | Ask user questions (single/multi/text) |
+| `get_system_info` | Get OS, architecture, home directory |
+| `run_command` | Execute shell commands |
+| `read_file` / `write_file` | Read/write files |
+| `list_directory` | Browse directories |
+| `list_processes` | View processes |
+| `check_port` | Check port usage |
+
+## Tech Architecture
+
+| Layer | Technology | Description |
+|-------|-----------|-------------|
+| Frontend | Vanilla JS + Vite | Zero framework, lightweight |
+| Backend | Rust + Tauri v2 | Native performance, cross-platform |
+| Communication | Tauri IPC + Shell Plugin | Frontend-backend bridge |
+| Styling | Pure CSS (CSS Variables) | Dark/Light themes, glassmorphism |
+
+## Build from Source
+
+```bash
+git clone https://github.com/qingchencloud/clawpanel.git
+cd clawpanel && npm install
+
+# Desktop (requires Rust + Tauri v2)
+npm run tauri dev        # Development
+npm run tauri build      # Production
+
+# Web only (no Rust needed)
+npm run dev              # Dev with hot reload
+npm run build && npm run serve  # Production
+```
+
+## Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [OpenClaw](https://github.com/1186258278/OpenClawChineseTranslation) | AI Agent Framework |
+| [ClawApp](https://github.com/qingchencloud/clawapp) | Cross-platform mobile chat client |
+| [cftunnel](https://github.com/qingchencloud/cftunnel) | Cloudflare Tunnel tool |
 
 ## Contributing
 
-Issues and Pull Requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+Issues and Pull Requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Acknowledgements
 

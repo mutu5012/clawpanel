@@ -402,8 +402,8 @@ function normalizeProviderUrls(config) {
     const apiType = (p.api || 'openai-completions').toLowerCase()
     if (apiType === 'anthropic-messages') {
       if (!url.endsWith('/v1')) url += '/v1'
-    } else if (apiType !== 'google-generative-ai') {
-      // Ollama 端口检测：11434 默认需要加 /v1
+    } else if (apiType !== 'google-generative-ai' && apiType !== 'ollama') {
+      // Ollama OpenAI 兼容模式端口检测：11434 默认需要加 /v1（ollama 原生 API 不需要）
       if (/:11434$/.test(url) && !url.endsWith('/v1')) url += '/v1'
       // 不再强制追加 /v1，尊重用户填写的 URL（火山引擎等第三方用 /v3 等路径）
     }

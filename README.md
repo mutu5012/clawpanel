@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>🇨🇳 中文</strong> | <a href="README.en.md">🇺🇸 English</a>
+  <strong>🇨🇳 中文</strong> | <a href="README.en.md">🇺🇸 English</a> | <a href="README.zh-TW.md">🇹🇼 繁體中文</a> | <a href="README.ja.md">🇯🇵 日本語</a> | <a href="README.ko.md">🇰🇷 한국어</a> | <a href="README.vi.md">🇻🇳 Tiếng Việt</a> | <a href="README.es.md">🇪🇸 Español</a> | <a href="README.pt.md">🇧🇷 Português</a> | <a href="README.ru.md">🇷🇺 Русский</a> | <a href="README.fr.md">🇫🇷 Français</a> | <a href="README.de.md">🇩🇪 Deutsch</a>
 </p>
 
 <p align="center">
@@ -41,15 +41,22 @@ ClawPanel 是 [OpenClaw](https://github.com/1186258278/OpenClawChineseTranslatio
 
 > 🌐 **官网**: [claw.qt.cool](https://claw.qt.cool/)  |  📦 **下载**: [GitHub Releases](https://github.com/qingchencloud/clawpanel/releases/latest)
 
-### ⚡ OpenClaw 独立安装包（零依赖，无需 Node.js/npm）
+### 🎁 晴辰云 AI 接口
 
-不想折腾 Node.js 环境？直接下载 [OpenClaw 独立安装包](https://github.com/qingchencloud/openclaw-standalone/releases/latest)，**内置运行时，解压即用**：
+> 内部技术测试平台，面向部分用户开放体验。签到领额度，邀请得更多。
 
-- **Windows**: 下载 `.exe` 安装向导，双击即装
-- **macOS / Linux / 树莓派**: `curl -fsSL https://dl.qrj.ai/openclaw/install.sh | bash`
-- **全平台**: [GitHub Releases](https://github.com/qingchencloud/openclaw-standalone/releases/latest)
+<p align="center">
+  <a href="https://gpt.qt.cool"><img src="https://img.shields.io/badge/🔑 晴辰云 AI-gpt.qt.cool-6366f1?style=for-the-badge" alt="晴辰云 AI"></a>
+</p>
 
-> ClawPanel 安装 OpenClaw 时会**自动优先使用独立安装包**，无需手动操作。此方案仅供不使用 ClawPanel 的用户独立安装。
+- **签到领测试额度** — 每日签到 + 邀请好友，持续获取测试额度
+- **兼容 OpenAI 接口** — 无缝对接 OpenClaw，即开即用
+- **资源策略** — 限速 + 请求上限，高峰期可能排队
+- **模型可用性** — 模型/接口以实际页面为准，可能灰度或版本切换
+
+配合 OpenClaw 使用：在 [gpt.qt.cool](https://gpt.qt.cool) 注册并签到领取测试额度，获取 API Key 后，初始化 OpenClaw 时选择 **OpenAI Compatible** 提供商，填入地址和 Key 即可使用。
+
+> ⚠️ **合规与责任边界**：本平台仅提供技术测试，禁止用于违法违规、绕过安全机制等用途。违规将限制访问并保留处置权。妥善保管 API Key，勿在截图/日志/代码库中泄露。具体规则以平台最新政策与页面展示为准。
 
 ### 🔥 开发板 / 嵌入式设备支持
 
@@ -90,7 +97,7 @@ ClawPanel 提供**纯 Web 版部署模式**（零 GUI 依赖），天然兼容 A
 <p align="center">
   <a href="https://discord.gg/U9AttmsNHh"><strong>Discord</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://yb.tencent.com/gp/i/LsvIw7mdR7Lb"><strong>元宝派</strong></a>
+  <a href="https://yb.tencent.com/gp/i/IIGXzcMcdh84"><strong>元宝派</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/qingchencloud/clawpanel/discussions"><strong>Discussions</strong></a>
   &nbsp;·&nbsp;
@@ -188,7 +195,7 @@ docker run -d --name clawpanel --restart unless-stopped \
 - **定时任务** — Cron 定时执行，支持多渠道投递
 - **日志查看** — 多日志源实时查看与关键词搜索
 - **记忆管理** — 记忆文件查看/编辑、分类管理、ZIP 导出、Agent 切换
-- **晴辰云 AI 接口** — 官方 AI 服务，签到送额度、充值最低 3 折消耗、未消耗包退
+- **晴辰云 AI 接口** — 内部技术测试平台，兼容 OpenAI 接口，签到领测试额度
 - **扩展工具** — cftunnel 内网穿透管理、ClawApp 状态监控
 - **关于** — 版本信息、社群入口、相关项目链接、一键升级
 
