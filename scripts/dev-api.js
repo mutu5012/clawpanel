@@ -1040,7 +1040,7 @@ function scanLocalSkillsFallback(agentSkillsDir = null) {
       status: 'scanned',
       scannedAt: new Date().toISOString(),
       scannedRoots,
-      cli: cliError ? { status: 'exec-failed', message: String(cliError?.message || cliError) } : null,
+      cli: null,
     },
   }
 }

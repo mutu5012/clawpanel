@@ -102,6 +102,7 @@ let _hostedAutoStopEl = null
 let _hostedSaveBtn = null, _hostedStopBtn = null, _hostedCloseBtn = null
 let _hostedDefaults = null
 let _hostedSessionConfig = null
+let _hostedBoundSessionKey = null
 let _hostedRuntime = { ...HOSTED_RUNTIME_DEFAULT }
 let _hostedBusy = false
 let _hostedAbort = null
@@ -1692,8 +1693,39 @@ function handleEvent(msg) {
 }
 
 function handleChatEvent(payload) {
-  // sessionKey 过滤
-  if (payload.sessionKey && payload.sessionKey !== _sessionKey && _sessionKey) return
+  const hostedSessionKey = getHostedBoundSessionKey()
+  const isCurrentSession = !payload.sessionKey || !_sessionKey || payload.sessionKey === _sessionKey
+  const isHostedSession = !!payload.sessionKey && !!hostedSessionKey && payload.sessionKey === hostedSessionKey
+
+  // sessionKey 过滤：当前会话照常渲染；托管绑定会话在后台继续驱动循环
+  if (!isCurrentSession && !isHostedSession) return
+
+  if (!isCurrentSession && isHostedSession) {
+    if (payload.state === 'final' && shouldCaptureHostedTarget(payload)) {
+      const c = extractChatContent(payload.message)
+      const capturedText = c?.text || ''
+      if (capturedText) {
+        appendHostedTarget(capturedText)
+        if (detectStopFromText(capturedText)) {
+          stopHostedAgent()
+        } else {
+          maybeTriggerHostedRun()
+        }
+      }
+    }
+
+    if (payload.state === 'error' && _hostedSessionConfig?.enabled) {
+      _hostedRuntime.errorCount = (_hostedRuntime.errorCount || 0) + 1
+      _hostedRuntime.lastError = payload.errorMessage || payload.error?.message || t('common.error')
+      _hostedRuntime.pending = false
+      if (_hostedRuntime.errorCount >= _hostedSessionConfig.retryLimit) {
+        _hostedRuntime.status = HOSTED_STATUS.ERROR
+      }
+      persistHostedRuntime()
+      updateHostedBadge()
+    }
+    return
+  }
 
   const { state } = payload
   const runId = payload.runId
@@ -2814,6 +2846,10 @@ function getHostedSessionKey() {
   return _sessionKey || localStorage.getItem(STORAGE_SESSION_KEY) || 'agent:main:main'
 }
 
+function getHostedBoundSessionKey() {
+  return _hostedSessionConfig?.boundSessionKey || _hostedBoundSessionKey || ''
+}
+
 async function loadHostedDefaults() {
   try {
     const panel = await api.readPanelConfig()
@@ -2827,23 +2863,28 @@ function loadHostedSessionConfig() {
   const key = getHostedSessionKey()
   const current = data[key] || {}
   _hostedSessionConfig = { ...HOSTED_DEFAULTS, ..._hostedDefaults, ...current }
+  if (_hostedSessionConfig.enabled && !_hostedSessionConfig.boundSessionKey) {
+    _hostedSessionConfig.boundSessionKey = key
+  }
+  _hostedBoundSessionKey = _hostedSessionConfig.boundSessionKey || null
   if (!_hostedSessionConfig.state) _hostedSessionConfig.state = { ...HOSTED_RUNTIME_DEFAULT }
   if (!_hostedSessionConfig.history) _hostedSessionConfig.history = []
   _hostedRuntime = { ...HOSTED_RUNTIME_DEFAULT, ..._hostedSessionConfig.state }
   updateHostedBadge()
 }
 
-function saveHostedSessionConfig(nextConfig) {
+function saveHostedSessionConfig(nextConfig, key = null) {
   let data = {}
   try { data = JSON.parse(localStorage.getItem(HOSTED_SESSIONS_KEY) || '{}') } catch { data = {} }
-  data[getHostedSessionKey()] = nextConfig
+  data[key || getHostedSessionKey()] = nextConfig
   localStorage.setItem(HOSTED_SESSIONS_KEY, JSON.stringify(data))
 }
 
-function persistHostedRuntime() {
+function persistHostedRuntime(persistKey = null) {
   if (!_hostedSessionConfig) return
   _hostedSessionConfig.state = { ..._hostedRuntime }
-  saveHostedSessionConfig(_hostedSessionConfig)
+  const key = persistKey || getHostedBoundSessionKey() || getHostedSessionKey()
+  saveHostedSessionConfig(_hostedSessionConfig, key)
 }
 
 function updateHostedBadge() {
@@ -2943,7 +2984,9 @@ async function startHostedAgent() {
   const retryLimit = Math.max(0, parseInt(_hostedRetryLimitEl?.value || HOSTED_DEFAULTS.retryLimit, 10))
   const timerOn = _page?.querySelector('#hosted-agent-timer-on')?.checked
   const autoStopMinutes = timerOn ? Math.max(0, parseInt(_hostedAutoStopEl?.value || 0, 10)) : 0
-  _hostedSessionConfig = { ..._hostedSessionConfig, prompt, enabled: true, maxSteps, stepDelayMs, retryLimit, autoStopMinutes }
+  const boundSessionKey = getHostedSessionKey()
+  _hostedBoundSessionKey = boundSessionKey
+  _hostedSessionConfig = { ..._hostedSessionConfig, prompt, enabled: true, maxSteps, stepDelayMs, retryLimit, autoStopMinutes, boundSessionKey }
   const sysContent = HOSTED_SYSTEM_PROMPT + '\n\nUser goal: ' + prompt
   if (!_hostedSessionConfig.history?.length) _hostedSessionConfig.history = [{ role: 'system', content: sysContent }]
   else if (_hostedSessionConfig.history[0]?.role === 'system') _hostedSessionConfig.history[0].content = sysContent
@@ -2968,6 +3011,7 @@ async function startHostedAgent() {
 
 function stopHostedAgent() {
   if (!_hostedSessionConfig) return
+  const boundSessionKey = getHostedBoundSessionKey() || getHostedSessionKey()
   if (_hostedAbort) { _hostedAbort.abort(); _hostedAbort = null }
   clearTimeout(_hostedAutoStopTimer); _hostedAutoStopTimer = null
   clearInterval(_countdownInterval); _countdownInterval = null
@@ -2979,7 +3023,8 @@ function stopHostedAgent() {
   _hostedRuntime.lastError = ''
   _hostedRuntime.errorCount = 0
   _hostedStartTime = 0
-  persistHostedRuntime()
+  persistHostedRuntime(boundSessionKey)
+  _hostedBoundSessionKey = null
   renderHostedPanel()
   updateHostedBadge()
   toast(t('chat.hostedStopped'), 'info')
@@ -2987,6 +3032,8 @@ function stopHostedAgent() {
 
 function shouldCaptureHostedTarget(payload) {
   if (!_hostedSessionConfig?.enabled) return false
+  const hostedSessionKey = getHostedBoundSessionKey()
+  if (payload?.sessionKey && hostedSessionKey && payload.sessionKey !== hostedSessionKey) return false
   if (_hostedRuntime.status === HOSTED_STATUS.PAUSED || _hostedRuntime.status === HOSTED_STATUS.ERROR || _hostedRuntime.status === HOSTED_STATUS.IDLE) return false
   if (payload?.message?.role && payload.message.role !== 'assistant') return false
   const ts = payload?.timestamp || Date.now()
@@ -3050,8 +3097,9 @@ function detectStopFromText(text) {
 async function runHostedAgentStep() {
   if (_hostedBusy || !_hostedSessionConfig?.enabled) return
   const prompt = (_hostedSessionConfig.prompt || '').trim()
+  const hostedSessionKey = getHostedBoundSessionKey() || getHostedSessionKey()
   if (!prompt) return
-  if (!wsClient.gatewayReady || !_sessionKey) {
+  if (!wsClient.gatewayReady || !hostedSessionKey) {
     _hostedRuntime.status = HOSTED_STATUS.PAUSED
     _hostedRuntime.lastError = 'Gateway not ready'
     persistHostedRuntime(); updateHostedBadge()
@@ -3099,7 +3147,7 @@ async function runHostedAgentStep() {
       _hostedRuntime.pending = false
       persistHostedRuntime(); updateHostedBadge()
       // 将指令发给 Gateway Agent
-      try { await wsClient.chatSend(_sessionKey, instruction) } catch {}
+      try { await wsClient.chatSend(hostedSessionKey, instruction) } catch {}
     } else {
       _hostedRuntime.status = HOSTED_STATUS.IDLE
       _hostedRuntime.pending = false
@@ -3221,6 +3269,8 @@ function normalizeHostedBaseUrl(raw, apiType) {
 
 function appendHostedOutput(text) {
   if (!text || !_messagesEl) return
+  const hostedSessionKey = getHostedBoundSessionKey()
+  if (hostedSessionKey && _sessionKey && hostedSessionKey !== _sessionKey) return
   const wrap = document.createElement('div')
   wrap.className = 'msg msg-system msg-hosted'
   wrap.textContent = `[${t('chat.hostedAgent')}] ${text}`
