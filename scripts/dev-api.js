@@ -618,15 +618,21 @@ async function _tryStandaloneInstall(version, logs, overrideBaseUrl = null) {
   if (!resp.ok) throw new Error(`standalone 清单不可用 (HTTP ${resp.status})`)
   const manifest = await resp.json()
 
-  const remoteVersion = manifest.version
+  // 兼容两种 latest.json 格式：
+  // 新格式（CI 生成）: { "editions": { "zh": { "version": "...", "base_url": "..." } } }
+  // 旧格式（兼容）:   { "version": "...", "base_url": "..." }
+  const editionObj = manifest?.editions?.zh
+  const remoteVersion = editionObj?.version || manifest.version
   if (!remoteVersion) throw new Error('standalone 清单缺少 version 字段')
   if (version !== 'latest' && !versionsMatch(remoteVersion, version)) {
     throw new Error(`standalone 版本 ${remoteVersion} 与请求版本 ${version} 不匹配`)
   }
 
-  const remoteBase = overrideBaseUrl || manifest.base_url || `${cfg.baseUrl}/${remoteVersion}`
+  const archivePrefix = editionObj ? 'openclaw-zh' : 'openclaw'
+  const manifestBaseUrl = editionObj?.base_url || manifest.base_url
+  const remoteBase = overrideBaseUrl || manifestBaseUrl || `${cfg.baseUrl}/${remoteVersion}`
   const ext = isWindows ? 'zip' : 'tar.gz'
-  const filename = `openclaw-${remoteVersion}-${platform}.${ext}`
+  const filename = `${archivePrefix}-${remoteVersion}-${platform}.${ext}`
   const downloadUrl = `${remoteBase}/${filename}`
 
   logs.push(`从 CDN 下载: ${filename}`)
@@ -5446,21 +5452,46 @@ const handlers = {
     // ── standalone 安装（auto / standalone-r2 / standalone-github） ──
     const tryStandalone = source !== 'official' && ['auto', 'standalone-r2', 'standalone-github'].includes(method)
     if (tryStandalone) {
-      try {
-        const githubBase = method === 'standalone-github'
-          ? `https://github.com/qingchencloud/openclaw-standalone/releases/download/v${ver}`
-          : null
-        const saResult = await _tryStandaloneInstall(ver, logs, githubBase)
-        if (saResult) {
-          const label = method === 'standalone-github' ? 'GitHub' : 'CDN'
-          logs.push(`✅ standalone (${label}) 安装完成`)
-          return logs.join('\n')
-        }
-      } catch (e) {
-        if (method === 'auto') {
-          logs.push(`standalone 不可用（${e.message}），降级到 npm 安装...`)
-        } else {
+      const githubReleaseBase = `https://github.com/qingchencloud/openclaw-standalone/releases/download/v${ver}`
+      if (method === 'standalone-github') {
+        // standalone-github 模式：只走 GitHub
+        try {
+          const saResult = await _tryStandaloneInstall(ver, logs, githubReleaseBase)
+          if (saResult) {
+            logs.push('✅ standalone (GitHub) 安装完成')
+            return logs.join('\n')
+          }
+        } catch (e) {
           throw new Error(`standalone 安装失败: ${e.message}`)
+        }
+      } else {
+        // auto / standalone-r2 模式：R2 CDN → GitHub Releases fallback
+        let cdnErr = null
+        try {
+          const saResult = await _tryStandaloneInstall(ver, logs, null)
+          if (saResult) {
+            logs.push('✅ standalone (CDN) 安装完成')
+            return logs.join('\n')
+          }
+        } catch (e) {
+          cdnErr = e.message
+          logs.push(`CDN 下载失败（${cdnErr}），尝试从 GitHub Releases 下载...`)
+        }
+        // Fallback: GitHub Releases
+        if (cdnErr) {
+          try {
+            const saResult = await _tryStandaloneInstall(ver, logs, githubReleaseBase)
+            if (saResult) {
+              logs.push('✅ standalone (GitHub) 安装完成')
+              return logs.join('\n')
+            }
+          } catch (e) {
+            if (method === 'auto') {
+              logs.push(`standalone 不可用（GitHub: ${e.message}），降级到 npm 安装...`)
+            } else {
+              throw new Error(`standalone 安装失败: CDN=${cdnErr}, GitHub=${e.message}`)
+            }
+          }
         }
       }
     }

@@ -727,6 +727,45 @@ export class WsClient {
     return this.request('sessions.reset', { key })
   }
 
+  // ===== 4.9: Sessions Compaction =====
+  sessionsCompactionList(key) {
+    return this.request('sessions.compaction.list', { key })
+  }
+
+  sessionsCompactionGet(key, checkpointId) {
+    return this.request('sessions.compaction.get', { key, checkpointId })
+  }
+
+  sessionsCompactionBranch(key, checkpointId) {
+    return this.request('sessions.compaction.branch', { key, checkpointId })
+  }
+
+  sessionsCompactionRestore(key, checkpointId) {
+    return this.request('sessions.compaction.restore', { key, checkpointId })
+  }
+
+  // ===== 4.9: Skills Gateway RPC =====
+  skillsSearch(query, limit) {
+    return this.request('skills.search', { query, limit })
+  }
+
+  skillsDetail(slug) {
+    return this.request('skills.detail', { slug })
+  }
+
+  // ===== 4.9: Approval management =====
+  execApprovalList() {
+    return this.request('exec.approval.list', {})
+  }
+
+  execApprovalGet(id) {
+    return this.request('exec.approval.get', { id })
+  }
+
+  pluginApprovalList() {
+    return this.request('plugin.approval.list', {})
+  }
+
   onEvent(callback) {
     this._eventListeners.push(callback)
     return () => { this._eventListeners = this._eventListeners.filter(fn => fn !== callback) }

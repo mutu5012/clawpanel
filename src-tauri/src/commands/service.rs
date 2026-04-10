@@ -1491,7 +1491,7 @@ mod platform {
     }
 
     /// 检测 Gateway 是否在运行，并返回其 PID
-    /// 策略：先 TCP 端口检测连通性，再用 netstat+WMIC 验证命令行是 OpenClaw Gateway
+    /// 策略：先 TCP 端口检测连通性，再用 netstat+PowerShell 验证命令行是 OpenClaw Gateway
     pub fn check_service_status(_uid: u32, _label: &str) -> (bool, Option<u32>) {
         let port = crate::commands::gateway_listen_port();
         let addr = format!("127.0.0.1:{port}");

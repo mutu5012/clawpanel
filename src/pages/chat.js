@@ -1289,10 +1289,14 @@ function renderSessionList(sessions) {
     const msgCount = s.messageCount || s.messages || 0
     const agentId = parseSessionAgent(key)
     const displayLabel = getDisplayLabel(key) || label
+    const cpCount = s.compactionCheckpointCount || 0
     return `<div class="chat-session-card${active}" data-key="${escapeAttr(key)}">
       <div class="chat-session-card-header">
         <span class="chat-session-label" title="${t('chat.doubleClickRename')}">${escapeAttr(displayLabel)}</span>
-        <button class="chat-session-del" data-del="${escapeAttr(key)}" title="${t('common.delete')}">×</button>
+        <div style="display:flex;gap:2px;align-items:center">
+          ${cpCount > 0 ? `<button class="chat-session-del" data-compaction="${escapeAttr(key)}" title="${t('chat.compactionHistory')}" style="color:var(--text-tertiary);font-size:11px">⟳${cpCount}</button>` : ''}
+          <button class="chat-session-del" data-del="${escapeAttr(key)}" title="${t('common.delete')}">×</button>
+        </div>
       </div>
       <div class="chat-session-card-meta">
         ${agentId && agentId !== 'main' ? `<span class="chat-session-agent">${escapeAttr(agentId)}</span>` : ''}
@@ -1303,6 +1307,8 @@ function renderSessionList(sessions) {
   }).join('')
 
   _sessionListEl.onclick = (e) => {
+    const cpBtn = e.target.closest('[data-compaction]')
+    if (cpBtn) { e.stopPropagation(); showCompactionHistory(cpBtn.dataset.compaction); return }
     const delBtn = e.target.closest('[data-del]')
     if (delBtn) { e.stopPropagation(); deleteSession(delBtn.dataset.del); return }
     const item = e.target.closest('[data-key]')
@@ -1430,6 +1436,96 @@ async function deleteSession(key) {
     else refreshSessionList()
   } catch (e) {
     toast(`${t('common.operationFailed')}: ${e.message}`, 'error')
+  }
+}
+
+// ===== 4.9: Sessions Compaction History =====
+async function showCompactionHistory(key) {
+  if (!key || !wsClient.gatewayReady) return
+  const label = getDisplayLabel(key)
+  toast(t('chat.compactionLoading'), 'info')
+  try {
+    const result = await wsClient.sessionsCompactionList(key)
+    const checkpoints = result?.checkpoints || []
+    if (!checkpoints.length) {
+      toast(t('chat.compactionEmpty'), 'info')
+      return
+    }
+    const listHtml = checkpoints.map((cp, idx) => {
+      const id = cp.id || cp.checkpointId || `cp-${idx}`
+      const ts = cp.timestamp || cp.createdAt || 0
+      const timeStr = ts ? new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts).toLocaleString() : '—'
+      const tokensBefore = cp.tokensBefore ?? '—'
+      const tokensAfter = cp.tokensAfter ?? '—'
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--border-primary);display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:13px;font-weight:500">#${idx + 1} · ${escapeAttr(timeStr)}</div>
+          <div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">${tokensBefore} → ${tokensAfter} tokens</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn btn-sm btn-secondary" data-cp-branch="${escapeAttr(id)}">${t('chat.compactionBranch')}</button>
+          <button class="btn btn-sm btn-warning" data-cp-restore="${escapeAttr(id)}">${t('chat.compactionRestore')}</button>
+        </div>
+      </div>`
+    }).join('')
+
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `<div class="modal" style="max-width:520px;max-height:80vh;overflow:auto">
+      <div class="modal-header"><h3>${escapeAttr(t('chat.compactionHistory'))}: ${escapeAttr(label)}</h3></div>
+      <div class="modal-body" style="padding:0 var(--space-md)">${listHtml}</div>
+      <div class="modal-footer"><button class="btn btn-secondary" data-cp-close>${t('common.close')}</button></div>
+    </div>`
+    document.body.appendChild(overlay)
+
+    overlay.addEventListener('click', async (e) => {
+      if (e.target === overlay || e.target.closest('[data-cp-close]')) {
+        overlay.remove()
+        return
+      }
+      const branchBtn = e.target.closest('[data-cp-branch]')
+      if (branchBtn) {
+        branchBtn.disabled = true
+        try {
+          const res = await wsClient.sessionsCompactionBranch(key, branchBtn.dataset.cpBranch)
+          toast(t('chat.compactionBranchDone'), 'success')
+          overlay.remove()
+          if (res?.key) void switchSession(res.key)
+          else refreshSessionList()
+        } catch (err) {
+          toast(`${t('common.operationFailed')}: ${err.message}`, 'error')
+          branchBtn.disabled = false
+        }
+        return
+      }
+      const restoreBtn = e.target.closest('[data-cp-restore]')
+      if (restoreBtn) {
+        const yes = await showConfirm(t('chat.compactionConfirmRestore'))
+        if (!yes) return
+        restoreBtn.disabled = true
+        try {
+          await wsClient.sessionsCompactionRestore(key, restoreBtn.dataset.cpRestore)
+          toast(t('chat.compactionRestoreDone'), 'success')
+          overlay.remove()
+          if (key === _sessionKey) {
+            clearMessages()
+            _lastHistoryHash = ''
+            loadHistory()
+          }
+          refreshSessionList()
+        } catch (err) {
+          toast(`${t('common.operationFailed')}: ${err.message}`, 'error')
+          restoreBtn.disabled = false
+        }
+      }
+    })
+  } catch (e) {
+    const msg = String(e?.message || e || '').toLowerCase()
+    if (msg.includes('unknown method') || msg.includes('not found') || msg.includes('unsupported')) {
+      toast(t('chat.compactionUnsupported'), 'warning')
+    } else {
+      toast(`${t('common.operationFailed')}: ${e.message}`, 'error')
+    }
   }
 }
 
