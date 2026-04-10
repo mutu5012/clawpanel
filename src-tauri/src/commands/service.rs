@@ -277,6 +277,85 @@ fn looks_like_gateway_config_mismatch(reason: &str) -> bool {
         || (has_newer_version && mentions_doctor_fix)
 }
 
+/// 直接修复 openclaw.json 中 plugins.entries.*.config 的多余属性
+/// 当 `openclaw doctor --fix` 无法修复时作为二级回退
+fn try_direct_config_strip() -> Result<bool, String> {
+    let config_path = crate::commands::openclaw_dir().join("openclaw.json");
+    let raw = std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("读取配置文件失败: {e}"))?;
+    let mut doc: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|e| format!("解析配置文件失败: {e}"))?;
+
+    // 从错误日志中提取哪些 plugin entry 有 additional properties
+    let err_log = read_gateway_error_log_excerpt(8192).to_lowercase();
+    let mut changed = false;
+
+    // 匹配形如 "plugins.entries.XXX.config: invalid config" 的模式
+    if let Some(entries) = doc
+        .pointer_mut("/plugins/entries")
+        .and_then(|v| v.as_object_mut())
+    {
+        let entry_names: Vec<String> = entries.keys().cloned().collect();
+        for name in &entry_names {
+            let pattern = format!("plugins.entries.{}.config", name).to_lowercase();
+            if err_log.contains(&pattern) {
+                if let Some(entry) = entries.get_mut(name) {
+                    if let Some(obj) = entry.as_object_mut() {
+                        if obj.contains_key("config") {
+                            guardian_log(&format!(
+                                "直接修复: 清空 plugins.entries.{name}.config（含多余属性）"
+                            ));
+                            obj.remove("config");
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 通用回退：如果错误日志提到 additional properties 但没匹配到具体 entry，
+    // 清空所有 plugin entry 的 config
+    if !changed
+        && (err_log.contains("additional properties") || err_log.contains("additional property"))
+    {
+        if let Some(entries) = doc
+            .pointer_mut("/plugins/entries")
+            .and_then(|v| v.as_object_mut())
+        {
+            let entry_names: Vec<String> = entries.keys().cloned().collect();
+            for name in &entry_names {
+                if let Some(entry) = entries.get_mut(name) {
+                    if let Some(obj) = entry.as_object_mut() {
+                        if obj.contains_key("config") {
+                            let config = obj.get("config").unwrap();
+                            if config.is_object()
+                                && config.as_object().map(|m| !m.is_empty()).unwrap_or(false)
+                            {
+                                guardian_log(&format!(
+                                    "直接修复(通用回退): 清空 plugins.entries.{name}.config"
+                                ));
+                                obj.remove("config");
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if changed {
+        let formatted = serde_json::to_string_pretty(&doc)
+            .map_err(|e| format!("序列化配置失败: {e}"))?;
+        std::fs::write(&config_path, formatted)
+            .map_err(|e| format!("写入配置文件失败: {e}"))?;
+        guardian_log("直接修复: 已写回 openclaw.json");
+    }
+
+    Ok(changed)
+}
+
 static GUARDIAN_STATE: OnceLock<Arc<Mutex<GuardianRuntimeState>>> = OnceLock::new();
 static GUARDIAN_STARTED: AtomicBool = AtomicBool::new(false);
 static GATEWAY_CONFIG_AUTO_FIX_STATE: OnceLock<Arc<Mutex<GatewayConfigAutoFixState>>> =
@@ -623,6 +702,47 @@ async fn start_service_impl_internal(
                         Ok(())
                     }
                     Err(retry_err) => {
+                        // 二级回退：doctor --fix 没解决问题，尝试直接修改 JSON
+                        if looks_like_gateway_config_mismatch(&retry_err) {
+                            guardian_log("doctor --fix 后仍失败，尝试直接修复 openclaw.json");
+                            match try_direct_config_strip() {
+                                Ok(true) => {
+                                    emit_guardian_event(
+                                        app,
+                                        "auto_fix_retry",
+                                        "已直接修复配置文件，正在再次重试启动 Gateway…",
+                                    );
+                                    #[cfg(target_os = "windows")]
+                                    {
+                                        platform::cleanup_zombie_gateway_processes();
+                                    }
+                                    tokio::time::sleep(Duration::from_millis(500)).await;
+                                    match start_service_impl_internal_once(label).await {
+                                        Ok(()) => {
+                                            emit_guardian_event(
+                                                app,
+                                                "auto_fix_success",
+                                                "已直接修复配置并成功启动 Gateway。",
+                                            );
+                                            return Ok(());
+                                        }
+                                        Err(e) => {
+                                            emit_guardian_event(
+                                                app,
+                                                "auto_fix_failure",
+                                                format!("直接修复后仍启动失败：{e}"),
+                                            );
+                                        }
+                                    }
+                                }
+                                Ok(false) => {
+                                    guardian_log("直接修复未找到可清理的配置项");
+                                }
+                                Err(e) => {
+                                    guardian_log(&format!("直接修复失败: {e}"));
+                                }
+                            }
+                        }
                         emit_guardian_event(
                             app,
                             "auto_fix_failure",
@@ -631,7 +751,7 @@ async fn start_service_impl_internal(
                             ),
                         );
                         Err(format!(
-                            "{retry_err}\n（已自动执行 openclaw doctor --fix 并重试启动 Gateway）"
+                            "{retry_err}\n（已自动执行 openclaw doctor --fix + 直接修复并重试启动 Gateway）"
                         ))
                     }
                 }
@@ -1033,23 +1153,47 @@ mod platform {
     /// 记录当前活跃的 Gateway 子进程（用于 stop 时精确 kill）
     static ACTIVE_GATEWAY_CHILD: Mutex<Option<u32>> = Mutex::new(None);
 
-    /// 清理残留的僵尸 Gateway 进程（启动时调用，防止 Windows 重启后多进程堆积）
-    pub(crate) fn cleanup_zombie_gateway_processes() {
-        let port = crate::commands::gateway_listen_port();
+    /// 检查 Gateway 端口是否有响应（阻塞式 HTTP /health，3s 超时）
+    fn is_gateway_port_responsive(port: u16) -> bool {
+        use std::io::{Read, Write as IoWrite};
+        use std::net::TcpStream;
+        let addr = format!("127.0.0.1:{port}");
+        let mut stream = match TcpStream::connect_timeout(
+            &addr.parse().unwrap(),
+            Duration::from_secs(3),
+        ) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
+        let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+        let req = format!("GET /health HTTP/1.0\r\nHost: 127.0.0.1:{port}\r\n\r\n");
+        if stream.write_all(req.as_bytes()).is_err() {
+            return false;
+        }
+        let mut buf = [0u8; 256];
+        match stream.read(&mut buf) {
+            Ok(n) if n > 0 => {
+                let resp = String::from_utf8_lossy(&buf[..n]);
+                resp.contains("200") || resp.contains("OK")
+            }
+            _ => false,
+        }
+    }
 
-        // 用 netstat 找到端口 18789 的所有监听进程 PID
+    /// 从 netstat 输出中提取监听指定端口的所有 PID
+    fn find_listening_pids(port: u16) -> Vec<u32> {
         let output = match StdCommand::new("netstat")
             .args(["-ano", "-p", "TCP"])
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
             Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
-            Err(_) => return,
+            Err(_) => return vec![],
         };
-
+        let mut pids = vec![];
         for line in output.lines() {
             let line = line.trim();
-            // 匹配  TCP    0.0.0.0:18789    0.0.0.0:0    LISTENING    <PID>
             if !line.contains(&format!(":{port}")) || !line.contains("LISTENING") {
                 continue;
             }
@@ -1057,28 +1201,52 @@ mod platform {
             if parts.len() < 5 {
                 continue;
             }
-            let pid_str = parts.last().unwrap();
-            let pid = match pid_str.parse::<u32>() {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
+            if let Ok(pid) = parts.last().unwrap().parse::<u32>() {
+                if pid > 0 && !pids.contains(&pid) {
+                    pids.push(pid);
+                }
+            }
+        }
+        pids
+    }
 
-            // 验证这个 PID 的命令行是否确实是 Gateway
+    /// 清理残留的僵尸 Gateway 进程（启动时调用，防止 Windows 重启后多进程堆积）
+    /// 增强：检测端口占用但 /health 无响应的僵尸进程，强制杀掉
+    pub(crate) fn cleanup_zombie_gateway_processes() {
+        let port = crate::commands::gateway_listen_port();
+        let pids = find_listening_pids(port);
+        if pids.is_empty() {
+            return;
+        }
+
+        // 先检查 /health 是否有响应 —— 如果端口有进程但无响应，说明是僵尸
+        let responsive = is_gateway_port_responsive(port);
+
+        for pid in &pids {
+            let pid = *pid;
+
             if let Some(cmdline) = read_process_command_line(pid) {
                 let cmdline_lower = cmdline.to_lowercase();
-                // 只要包含 openclaw 且包含 gateway 就认为是 Gateway 进程
-                // 排除纯 node.exe（可能是其他应用）
-                if cmdline_lower.contains("openclaw") && cmdline_lower.contains("gateway") {
-                    // 只杀我们自己的 PID，不杀记录中的"已知好进程"
-                    let our_pid = *LAST_KNOWN_GATEWAY_PID.lock().unwrap();
-                    if Some(pid) != our_pid {
+                let is_gateway = cmdline_lower.contains("openclaw") && cmdline_lower.contains("gateway");
+                let our_pid = *LAST_KNOWN_GATEWAY_PID.lock().unwrap();
+
+                if is_gateway {
+                    if !responsive {
+                        // /health 无响应 → 僵尸进程，无条件杀掉（包括"已知好进程"）
+                        super::guardian_log(&format!(
+                            "检测到僵尸 Gateway 进程 (PID {pid})：端口 {port} 占用但 /health 无响应，强制终止"
+                        ));
+                        kill_process_tree(pid);
+                    } else if Some(pid) != our_pid {
+                        // /health 有响应但不是我们启动的 → 旧进程残留
+                        super::guardian_log(&format!(
+                            "清理残留 Gateway 进程 (PID {pid})：非当前实例"
+                        ));
                         kill_process_tree(pid);
                     }
                 }
-            } else {
-                // 读不到命令行时，不做假设，避免误杀其他进程
-                continue;
             }
+            // 读不到命令行时，不做假设，避免误杀其他进程
         }
     }
 
@@ -1940,4 +2108,15 @@ pub async fn claim_gateway() -> Result<(), String> {
     }
     write_gateway_owner(pid)?;
     Ok(())
+}
+
+/// 轻量 TCP 端口探测：检测 Gateway 端口是否可连通（用于 WS 连接前的就绪等待）
+#[tauri::command]
+pub async fn probe_gateway_port() -> bool {
+    let port = crate::commands::gateway_listen_port();
+    let addr = format!("127.0.0.1:{port}");
+    match tokio::net::TcpStream::connect(&addr).await {
+        Ok(_) => true,
+        Err(_) => false,
+    }
 }

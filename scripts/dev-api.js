@@ -3373,6 +3373,79 @@ const handlers = {
     }
   },
 
+  list_all_plugins() {
+    const cfg = readOpenclawConfigOptional()
+    const entries = cfg.plugins?.entries || {}
+    const allowArr = cfg.plugins?.allow || []
+    const extDir = path.join(OPENCLAW_DIR, 'extensions')
+    const plugins = []
+    const seen = new Set()
+
+    // Scan extensions directory
+    if (fs.existsSync(extDir)) {
+      for (const name of fs.readdirSync(extDir)) {
+        if (name.startsWith('.')) continue
+        const p = path.join(extDir, name)
+        if (!fs.statSync(p).isDirectory()) continue
+        const hasMarker = fs.existsSync(path.join(p, 'package.json')) || fs.existsSync(path.join(p, 'plugin.ts')) || fs.existsSync(path.join(p, 'index.js'))
+        if (!hasMarker) continue
+        seen.add(name)
+        const entryCfg = entries[name]
+        const enabled = !!entryCfg?.enabled
+        const allowed = allowArr.includes(name)
+        let version = null, description = null
+        try {
+          const pkg = JSON.parse(fs.readFileSync(path.join(p, 'package.json'), 'utf8'))
+          version = pkg.version || null
+          description = pkg.description || null
+        } catch {}
+        plugins.push({ id: name, installed: true, builtin: false, enabled, allowed, version, description, config: entryCfg?.config || null })
+      }
+    }
+
+    // Include entries from config not found in extensions dir
+    for (const [pid, val] of Object.entries(entries)) {
+      if (seen.has(pid)) continue
+      seen.add(pid)
+      plugins.push({ id: pid, installed: false, builtin: false, enabled: !!val?.enabled, allowed: allowArr.includes(pid), version: null, description: null, config: val?.config || null })
+    }
+
+    plugins.sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0) || a.id.localeCompare(b.id))
+    return { plugins }
+  },
+
+  toggle_plugin({ pluginId, enabled }) {
+    if (!pluginId || !pluginId.trim()) throw new Error('pluginId 不能为空')
+    const pid = pluginId.trim()
+    const cfg = readOpenclawConfigOptional()
+    if (!cfg.plugins) cfg.plugins = {}
+    if (!cfg.plugins.entries) cfg.plugins.entries = {}
+    if (!cfg.plugins.allow) cfg.plugins.allow = []
+
+    if (enabled) {
+      if (!cfg.plugins.allow.includes(pid)) cfg.plugins.allow.push(pid)
+      if (!cfg.plugins.entries[pid]) cfg.plugins.entries[pid] = {}
+      cfg.plugins.entries[pid].enabled = true
+    } else {
+      cfg.plugins.allow = cfg.plugins.allow.filter(v => v !== pid)
+      if (cfg.plugins.entries[pid]) cfg.plugins.entries[pid].enabled = false
+    }
+
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf8')
+    return { ok: true, enabled, pluginId: pid }
+  },
+
+  install_plugin({ packageName }) {
+    if (!packageName || !packageName.trim()) throw new Error('包名不能为空')
+    const spec = packageName.trim()
+    try {
+      execOpenclawSync(['plugins', 'install', spec], { timeout: 120000, cwd: homedir(), windowsHide: true }, `插件 ${spec} 安装失败`)
+      return { ok: true, output: '安装成功' }
+    } catch (e) {
+      throw new Error(`插件安装失败: ${e.message || e}`)
+    }
+  },
+
   get_channel_plugin_status({ pluginId }) {
     if (!pluginId || !pluginId.trim()) throw new Error('pluginId 不能为空')
     const pid = pluginId.trim()
@@ -4477,6 +4550,129 @@ const handlers = {
       return `已配置 Git HTTPS 替代 SSH（${success}/${GIT_HTTPS_REWRITES.length} 条规则）`
     } catch (e) {
       throw new Error('配置失败: ' + (e.message || e))
+    }
+  },
+
+  async probe_gateway_port() {
+    const port = readGatewayPort()
+    return new Promise(resolve => {
+      const net = require('net')
+      const sock = net.createConnection({ host: '127.0.0.1', port, timeout: 3000 })
+      sock.on('connect', () => { sock.destroy(); resolve(true) })
+      sock.on('error', () => resolve(false))
+      sock.on('timeout', () => { sock.destroy(); resolve(false) })
+    })
+  },
+
+  async diagnose_gateway_connection() {
+    const steps = []
+    const ocDir = openclawDir()
+    const configPath = path.join(ocDir, 'openclaw.json')
+    const port = readGatewayPort()
+
+    // 1. 配置文件
+    const t1 = Date.now()
+    try {
+      const content = fs.readFileSync(configPath, 'utf-8')
+      const val = JSON.parse(content)
+      steps.push({ name: 'config', ok: !!val.gateway, message: val.gateway ? '配置文件有效，含 gateway 配置' : '配置文件缺少 gateway 段', durationMs: Date.now() - t1 })
+    } catch (e) {
+      steps.push({ name: 'config', ok: false, message: `配置文件异常: ${e.message}`, durationMs: Date.now() - t1 })
+    }
+
+    // 2. 设备密钥
+    const t2 = Date.now()
+    const keyPath = path.join(ocDir, 'clawpanel-device-key.json')
+    const keyExists = fs.existsSync(keyPath)
+    steps.push({ name: 'device_key', ok: keyExists, message: keyExists ? '设备密钥存在' : '设备密钥不存在', durationMs: Date.now() - t2 })
+
+    // 3. allowedOrigins
+    const t3 = Date.now()
+    try {
+      const val = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      const origins = val?.gateway?.controlUi?.allowedOrigins
+      if (Array.isArray(origins) && origins.length > 0) {
+        steps.push({ name: 'allowed_origins', ok: true, message: `allowedOrigins: ${JSON.stringify(origins)}`, durationMs: Date.now() - t3 })
+      } else {
+        steps.push({ name: 'allowed_origins', ok: false, message: '未配置 allowedOrigins', durationMs: Date.now() - t3 })
+      }
+    } catch {
+      steps.push({ name: 'allowed_origins', ok: false, message: '配置文件不可读', durationMs: Date.now() - t3 })
+    }
+
+    // 4. TCP 端口
+    const t4 = Date.now()
+    const tcpOk = await new Promise(resolve => {
+      const net = require('net')
+      const sock = net.createConnection({ host: '127.0.0.1', port, timeout: 3000 })
+      sock.on('connect', () => { sock.destroy(); resolve(true) })
+      sock.on('error', () => resolve(false))
+      sock.on('timeout', () => { sock.destroy(); resolve(false) })
+    })
+    steps.push({ name: 'tcp_port', ok: tcpOk, message: tcpOk ? `端口 ${port} 可达` : `端口 ${port} 不可达`, durationMs: Date.now() - t4 })
+
+    // 5. HTTP /health
+    const t5 = Date.now()
+    let httpOk = false
+    let httpMsg = ''
+    try {
+      const resp = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(5000) })
+      httpOk = resp.ok
+      httpMsg = `HTTP /health 返回 ${resp.status}`
+    } catch (e) {
+      httpMsg = `HTTP /health 请求失败: ${e.message}`
+    }
+    steps.push({ name: 'http_health', ok: httpOk, message: httpMsg, durationMs: Date.now() - t5 })
+
+    // 6. 错误日志
+    const t6 = Date.now()
+    const errLogPath = path.join(ocDir, 'logs', 'gateway.err.log')
+    if (fs.existsSync(errLogPath)) {
+      const stat = fs.statSync(errLogPath)
+      if (stat.size === 0) {
+        steps.push({ name: 'err_log', ok: true, message: '错误日志为空（正常）', durationMs: Date.now() - t6 })
+      } else {
+        const buf = Buffer.alloc(Math.min(1024, stat.size))
+        const fd = fs.openSync(errLogPath, 'r')
+        fs.readSync(fd, buf, 0, buf.length, Math.max(0, stat.size - buf.length))
+        fs.closeSync(fd)
+        const tail = buf.toString('utf-8').toLowerCase()
+        const hasFatal = tail.includes('fatal') || tail.includes('eaddrinuse') || tail.includes('config invalid')
+        steps.push({ name: 'err_log', ok: !hasFatal, message: hasFatal ? `错误日志含关键错误 (${stat.size} bytes)` : `错误日志存在但无致命错误 (${stat.size} bytes)`, durationMs: Date.now() - t6 })
+      }
+    } else {
+      steps.push({ name: 'err_log', ok: true, message: '无错误日志（正常）', durationMs: Date.now() - t6 })
+    }
+
+    // env
+    let authMode = 'none'
+    try {
+      const val = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      const auth = val?.gateway?.auth
+      if (auth?.token) authMode = 'token'
+      else if (auth?.password) authMode = 'password'
+    } catch {}
+    let errLogExcerpt = ''
+    try {
+      const buf = fs.readFileSync(errLogPath)
+      errLogExcerpt = buf.slice(Math.max(0, buf.length - 2048)).toString('utf-8')
+    } catch {}
+
+    const overallOk = steps.every(s => s.ok)
+    const failed = steps.filter(s => !s.ok).map(s => s.name)
+    return {
+      steps,
+      env: {
+        openclawDir: ocDir,
+        configExists: fs.existsSync(configPath),
+        port,
+        authMode,
+        deviceKeyExists: keyExists,
+        gatewayOwner: null,
+        errLogExcerpt,
+      },
+      overallOk,
+      summary: overallOk ? '所有检查项通过' : `以下检查未通过: ${failed.join(', ')}`,
     }
   },
 
